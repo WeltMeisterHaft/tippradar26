@@ -4,6 +4,8 @@
   const client = configured ? window.supabase.createClient(config.supabaseUrl, config.supabaseKey) : null;
   let session = null;
   let league = null;
+  let profiles = [];
+  let activeProfile = null;
 
   async function init() {
     if (!client) return { configured: false };
@@ -20,7 +22,7 @@
   async function loadMembership() {
     const { data, error } = await client
       .from("league_members")
-      .select("league_id, display_name, role, leagues(id, name, invite_code)")
+      .select("league_id, display_name, role, account_type, leagues(id, name, invite_code)")
       .eq("user_id", session.user.id)
       .limit(1)
       .maybeSingle();
@@ -30,9 +32,50 @@
       name: data.leagues.name,
       inviteCode: data.leagues.invite_code,
       displayName: data.display_name,
-      role: data.role
+      role: data.role,
+      accountType: data.account_type || "single"
     } : null;
+    if (league) await loadProfiles();
     return league;
+  }
+
+  async function ensurePrimaryProfile(accountType = "single") {
+    const { error } = await client.rpc("ensure_primary_profile", { target_account_type: accountType });
+    if (error) throw error;
+    if (league) league.accountType = accountType;
+    return loadProfiles();
+  }
+
+  async function loadProfiles() {
+    if (!league || !session) return [];
+    const { data, error } = await client.from("participant_profiles")
+      .select("id, display_name, profile_type, is_primary, account_user_id")
+      .eq("league_id", league.id)
+      .order("created_at");
+    if (error) throw error;
+    profiles = data || [];
+    const owned = profiles.filter((profile) => profile.account_user_id === session.user.id);
+    const remembered = localStorage.getItem(`tippradar26-active-profile-${league.id}`);
+    activeProfile = owned.find((profile) => profile.id === remembered)
+      || owned.find((profile) => profile.is_primary) || owned[0] || null;
+    return profiles;
+  }
+
+  function selectProfile(profileId) {
+    const profile = profiles.find((item) => item.id === profileId && item.account_user_id === session?.user?.id);
+    if (!profile) return null;
+    activeProfile = profile;
+    localStorage.setItem(`tippradar26-active-profile-${league.id}`, profile.id);
+    return profile;
+  }
+
+  async function addFamilyProfile(displayName) {
+    const { error } = await client.rpc("add_family_profile", { child_name: displayName });
+    if (error) throw error;
+    await loadProfiles();
+    activeProfile = profiles.filter((profile) => profile.account_user_id === session.user.id).at(-1);
+    localStorage.setItem(`tippradar26-active-profile-${league.id}`, activeProfile.id);
+    return activeProfile;
   }
 
   async function sendMagicLink(email) {
@@ -49,6 +92,8 @@
     await client.auth.signOut();
     session = null;
     league = null;
+    profiles = [];
+    activeProfile = null;
   }
 
   async function createLeague(name, inviteCode, displayName) {
@@ -59,6 +104,7 @@
     });
     if (error) throw error;
     await loadMembership();
+    await ensurePrimaryProfile("single");
     return data;
   }
 
@@ -69,6 +115,7 @@
     });
     if (error) throw error;
     await loadMembership();
+    await ensurePrimaryProfile("single");
     return data;
   }
 
@@ -95,12 +142,12 @@
   }
 
   async function loadPredictions() {
-    if (!league || !session) return {};
+    if (!league || !activeProfile) return {};
     const { data, error } = await client
-      .from("predictions")
+      .from("profile_predictions")
       .select("match_id, home_score, away_score")
       .eq("league_id", league.id)
-      .eq("user_id", session.user.id);
+      .eq("profile_id", activeProfile.id);
     if (error) throw error;
     return Object.fromEntries(data.map((tip) => [
       tip.match_id,
@@ -111,14 +158,14 @@
   async function loadLeaguePredictions() {
     if (!league) return {};
     const [{ data: members, error: memberError }, { data: tips, error: tipError }] = await Promise.all([
-      client.from("league_members").select("user_id, display_name").eq("league_id", league.id),
-      client.from("predictions").select("user_id, match_id, home_score, away_score").eq("league_id", league.id)
+      client.from("participant_profiles").select("id, display_name").eq("league_id", league.id),
+      client.from("profile_predictions").select("profile_id, match_id, home_score, away_score").eq("league_id", league.id)
     ]);
     if (memberError || tipError) return {};
-    const names = Object.fromEntries((members || []).map((member) => [member.user_id, member.display_name]));
+    const names = Object.fromEntries((members || []).map((member) => [member.id, member.display_name]));
     const result = {};
     (tips || []).forEach((tip) => {
-      const name = names[tip.user_id];
+      const name = names[tip.profile_id];
       if (!name) return;
       result[name] ||= {};
       result[name][tip.match_id] = `${tip.home_score}:${tip.away_score}`;
@@ -160,18 +207,73 @@
   }
 
   async function savePredictions(tips) {
-    if (!league || !session) return;
+    if (!league || !activeProfile) return;
     const rows = Object.entries(tips).map(([matchId, tip]) => ({
-      league_id: league.id,
-      user_id: session.user.id,
       match_id: matchId,
       home_score: tip.home,
-      away_score: tip.away,
-      updated_at: new Date().toISOString()
+      away_score: tip.away
     }));
     if (!rows.length) return;
-    const { error } = await client.from("predictions").upsert(rows, {
-      onConflict: "league_id,user_id,match_id"
+    const { error } = await client.rpc("save_profile_predictions", {
+      target_profile: activeProfile.id, tips: rows
+    });
+    if (error) throw error;
+  }
+
+  async function loadFantasyPicks() {
+    if (!league || !activeProfile) return [];
+    const { data, error } = await client.from("fantasy_picks")
+      .select("slot, player_name, national_team")
+      .eq("league_id", league.id).eq("profile_id", activeProfile.id).order("slot");
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function saveFantasyPicks(picks) {
+    if (!activeProfile) return;
+    const { error } = await client.rpc("save_fantasy_picks", {
+      target_profile: activeProfile.id, picks
+    });
+    if (error) throw error;
+  }
+
+  async function recordPlayerEvent(matchId, playerName, nationalTeam, goals) {
+    const { error } = await client.rpc("record_player_event", {
+      target_match: String(matchId), scorer_name: playerName,
+      scorer_team: nationalTeam, scorer_goals: goals
+    });
+    if (error) throw error;
+  }
+
+  async function loadStandings() {
+    if (!league) return [];
+    const { data: allProfiles } = await client.from("participant_profiles")
+      .select("id, display_name").eq("league_id", league.id);
+    const { data: tipPoints } = await client.from("profile_predictions")
+      .select("profile_id, points").eq("league_id", league.id);
+    const { data: fantasyPoints } = await client.from("fantasy_match_points")
+      .select("profile_id, goal_points, win_points").eq("league_id", league.id);
+    return (allProfiles || []).map((profile) => ({
+      ...profile,
+      tipPoints: (tipPoints || []).filter((row) => row.profile_id === profile.id)
+        .reduce((sum, row) => sum + Number(row.points || 0), 0),
+      fantasyPoints: (fantasyPoints || []).filter((row) => row.profile_id === profile.id)
+        .reduce((sum, row) => sum + Number(row.goal_points || 0) + Number(row.win_points || 0), 0)
+    }));
+  }
+
+  async function saveBotPredictions(tips) {
+    if (!league || league.role !== "organizer" || !tips.length) return;
+    const { error } = await client.rpc("upsert_bot_predictions", {
+      bot_tips: tips.map((tip) => ({
+        bot_id: tip.botId,
+        bot_name: tip.botName,
+        team_id: tip.teamId,
+        match_id: tip.matchId,
+        home_score: tip.home,
+        away_score: tip.away,
+        strategy: tip.strategy
+      }))
     });
     if (error) throw error;
   }
@@ -188,11 +290,15 @@
   }
 
   window.TippRadarCloud = {
-    init, sendMagicLink, signOut, createLeague, joinLeague,
-    loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions,
+    init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
+    loadProfiles, selectProfile, addFamilyProfile,
+    loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions, saveBotPredictions,
+    loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, loadStandings,
     loadTeamScores, syncSchedule, scoreMatch,
     get configured() { return configured; },
     get session() { return session; },
-    get league() { return league; }
+    get league() { return league; },
+    get profiles() { return profiles; },
+    get activeProfile() { return activeProfile; }
   };
 })();

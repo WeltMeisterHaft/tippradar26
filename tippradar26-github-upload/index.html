@@ -36,12 +36,12 @@
           <div class="hero-copy">
             <span class="eyebrow"><i></i> Bald geht's los &middot; noch <strong id="countdown">2 Tage</strong></span>
             <h1>Unser Sommer.<br><span>Unsere Tipps.</span></h1>
-            <p>Gemeinsam fiebern, tippen und staunen. Und zwischendurch versuchen wir, COOPER zu schlagen.</p>
+            <p>Gemeinsam fiebern, tippen und staunen. Und zwischendurch fordern wir unsere drei Auto-Tipper heraus.</p>
             <button class="primary-button" data-go="tips">Meinen Tipp abgeben <span aria-hidden="true">&rarr;</span></button>
             <div class="hero-metrics">
               <span><strong>104</strong> Spiele</span>
-              <span><strong>2.826</strong> Teilnehmer</span>
-              <span><strong>1</strong> COOPER</span>
+              <span><strong>20</strong> Pl&auml;tze</span>
+              <span><strong>3</strong> Tippmodelle</span>
             </div>
           </div>
 
@@ -60,7 +60,7 @@
               <div class="prediction-split">
                 <div><span>Community</span><strong>2:0</strong></div>
                 <i></i>
-                <div class="cooper-mini"><span>COOPER SAGT</span><strong>2:0</strong></div>
+                <div class="cooper-mini"><span>AUTO-TIPPER</span><strong>3 Modelle</strong></div>
               </div>
             </div>
           </div>
@@ -86,9 +86,9 @@
           <article class="dashboard-card cooper-card">
             <div class="cooper-orbit"><span>C</span></div>
             <div>
-              <span>Unser besonderer Mitspieler</span>
-              <h3>COOPER</h3>
-              <p>Tippt n&uuml;chtern nach Wettquoten. Mal sehen, ob das reicht.</p>
+              <span>Unsere besonderen Mitspieler</span>
+              <h3>AUTO-TIPPER</h3>
+              <p>DOG tippt zuf&auml;llig, RANK nach FIFA-Rang und STAT mit einem einfachen Tormodell.</p>
             </div>
             <div class="cooper-status"><i></i> Bereit f&uuml;r den Spieltag</div>
           </article>
@@ -107,12 +107,21 @@
           <button class="date-tab"><small>FR</small><strong>12. JUN</strong><span>2 Spiele</span></button>
           <button class="date-tab"><small>SA</small><strong>13. JUN</strong><span>4 Spiele</span></button>
         </div>
-        <div class="odds-info">
-          <span class="cooper-dot">C</span>
-          <div><strong>COOPER hat schon getippt</strong><p>Sein Tipp folgt nur den &ouml;ffentlichen Wettquoten. Ganz ohne Lieblingsmannschaft und Bauchgef&uuml;hl.</p></div>
-          <span class="source-pill">Mehr erfahren</span>
+        <div class="model-info">
+          <span class="cooper-dot">A</span>
+          <div><strong>Drei kostenlose Auto-Tipper</strong><p>DOG nutzt Zufall, RANK den FIFA-Ranglistenstand und STAT zus&auml;tzlich ein mathematisches Tormodell.</p></div>
+          <span class="source-pill">Stand 19.11.2025</span>
         </div>
         <div class="matches" id="matches-list"></div>
+        <section class="fantasy-card">
+          <div class="fantasy-heading">
+            <div><span class="section-kicker">Meine Top 5</span><h2>Deine f&uuml;nf Turnierspieler</h2></div>
+            <span class="fantasy-counter" id="fantasy-counter">0 / 5 gew&auml;hlt</span>
+          </div>
+          <p>Je Tor gibt es einen Zusatzpunkt. Gewinnt die zugeordnete Nationalmannschaft, gibt es ebenfalls einen Zusatzpunkt.</p>
+          <div class="fantasy-picks" id="fantasy-picks"></div>
+          <button class="secondary-button" id="save-fantasy-picks">Top 5 speichern</button>
+        </section>
         <div class="save-panel">
           <div><strong id="tip-progress">0 von 3 Tipps abgegeben</strong><span>Deine Tipps werden auf diesem Ger&auml;t gespeichert.</span></div>
           <button class="primary-button save-button" id="save-tips">Tipps speichern</button>
@@ -158,7 +167,7 @@
           <div class="matrix-footer">
             <span><i class="matrix-swatch exact"></i> Exakter Tipp</span>
             <span><i class="matrix-swatch tendency"></i> Richtige Tendenz</span>
-            <span><i class="matrix-swatch cooper"></i> COOPER / Quotenmodell</span>
+            <span><i class="matrix-swatch cooper"></i> Automatischer Tipp-Spieler</span>
             <small>Vor Anpfiff nur innerhalb der privaten Liga sichtbar.</small>
           </div>
         </section>
@@ -172,14 +181,15 @@
             </table>
           </div>
           <aside class="cooper-panel">
-            <span class="panel-label">QUOTEN-SPIELER</span>
-            <div class="cooper-core"><span>C</span><i></i></div>
-            <h3>Noch offen</h3>
-            <p>Lege COOPER oder einen eigenen Quoten-Spieler in einem Team an.</p>
+            <span class="panel-label">AUTO-TIPPER</span>
+            <div class="cooper-core"><span>A</span><i></i></div>
+            <h3>Drei Strategien</h3>
+            <p>Lege einen automatischen Mitspieler an und w&auml;hle seine nachvollziehbare Strategie.</p>
             <dl>
-              <div><dt>Strategie</dt><dd>Marktquoten</dd></div>
+              <div><dt>DOG</dt><dd>Zufall</dd></div>
+              <div><dt>RANK</dt><dd>FIFA-Rangliste</dd></div>
+              <div><dt>STAT</dt><dd>Rang + Poisson</dd></div>
               <div><dt>Gewichtung</dt><dd>0,75 bis 1,25</dd></div>
-              <div><dt>Herz-Faktor</dt><dd>0,0%</dd></div>
             </dl>
           </aside>
         </div>
@@ -201,6 +211,18 @@
           <span class="rule-formula">GEWICHTETE TOP 5</span>
         </div>
         <p class="team-link-note">Wichtig f&uuml;r die Auswertung: Der Anzeigename bei der Anmeldung muss dem Spielernamen im Team entsprechen.</p>
+        <p class="team-link-note model-note">RANK und STAT arbeiten mit einem festen FIFA-Ranglisten-Snapshot vom 19. November 2025. STAT berechnet daraus erwartete Tore; es sind keine Live-Quoten.</p>
+
+        <section class="scorer-admin" id="scorer-admin" hidden>
+          <div><span class="section-kicker">Nur Organisator</span><h2>Torsch&uuml;tzen erfassen</h2><p>Nur Spieler eintragen, die in einer Top-5-Auswahl vorkommen.</p></div>
+          <div class="scorer-form">
+            <select id="scorer-match"></select>
+            <input id="scorer-player" type="text" placeholder="Name des Torsch&uuml;tzen">
+            <input id="scorer-team" type="text" placeholder="Nationalmannschaft">
+            <input id="scorer-goals" type="number" min="1" max="10" value="1" aria-label="Tore">
+            <button class="primary-button" id="save-scorer">Speichern</button>
+          </div>
+        </section>
 
         <section class="bot-creator" id="team-creator" hidden>
           <div class="creator-heading">
@@ -243,7 +265,7 @@
             </div>
           </div>
           <div class="rules-footer">
-            <label class="check-option"><input type="checkbox" checked><span>Quoten-Teilnehmer z&auml;hlen vollwertig f&uuml;r Einzel- und Teamwertung</span></label>
+            <label class="check-option"><input type="checkbox" checked><span>Automatische Teilnehmer z&auml;hlen vollwertig f&uuml;r Einzel- und Teamwertung</span></label>
             <button class="secondary-button" id="save-rules">Regeln speichern</button>
           </div>
         </section>
@@ -277,6 +299,7 @@
           <span class="section-kicker">Willkommen</span>
           <h2>Tipprunde ausw&auml;hlen</h2>
           <label class="account-field"><span>Dein Anzeigename</span><input id="member-name" type="text" placeholder="Dein Name"></label>
+          <label class="account-field"><span>Kontoart</span><select id="account-type"><option value="single">Single / ein Teilnehmer</option><option value="family">Family / mehrere Profile</option></select></label>
           <div class="onboarding-options">
             <div><strong>Runde beitreten</strong><input id="join-code" type="text" maxlength="12" placeholder="Einladungscode"><button id="join-league">Beitreten</button></div>
             <div><strong>Neue Runde erstellen</strong><input id="league-name" type="text" placeholder="Name der Runde"><input id="new-invite-code" type="text" maxlength="12" placeholder="Wunschcode"><button id="create-league">Erstellen</button></div>
@@ -287,6 +310,14 @@
           <h2 id="cloud-league-name">Unsere Tipprunde</h2>
           <p>Teams, Regeln und Tipps werden jetzt f&uuml;r alle Teilnehmer zentral gespeichert.</p>
           <div class="setup-hint">Einladungscode: <strong id="cloud-invite-code"></strong></div>
+          <div class="profile-switcher">
+            <label><span>Kontoart</span><select id="current-account-type"><option value="single">Single</option><option value="family">Family</option></select></label>
+            <label><span>Wer tippt gerade?</span><select id="active-profile"></select></label>
+            <div id="family-profile-creator" hidden>
+              <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Kindes">
+              <button id="add-family-profile">+ Kinderprofil</button>
+            </div>
+          </div>
           <button class="secondary-button full-button" id="sign-out">Abmelden</button>
         </div>
       </div>

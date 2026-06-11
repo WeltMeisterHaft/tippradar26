@@ -3,19 +3,19 @@ const demoMatches = [
     id: "mex-za", time: "Do / 21:00", group: "Gruppe A / Mexico City",
     kickoff: "2026-06-11T21:00:00+02:00", matchday: "1",
     home: "Mexiko", away: "S\u00fcdafrika", homeFlag: "&#x1F1F2;&#x1F1FD;", awayFlag: "&#x1F1FF;&#x1F1E6;",
-    crowd: "2:0", crowdPercent: 68, odds: [1.44, 4.20, 7.50], cooper: "2:0", confidence: 69
+    crowd: "2:0", crowdPercent: 68
   },
   {
     id: "kor-cze", time: "Fr / 03:00", group: "Gruppe A / Guadalajara",
     kickoff: "2026-06-12T03:00:00+02:00", matchday: "1",
     home: "S\u00fcdkorea", away: "Tschechien", homeFlag: "&#x1F1F0;&#x1F1F7;", awayFlag: "&#x1F1E8;&#x1F1FF;",
-    crowd: "1:1", crowdPercent: 42, odds: [2.70, 3.10, 2.65], cooper: "1:1", confidence: 36
+    crowd: "1:1", crowdPercent: 42
   },
   {
     id: "can-bih", time: "Fr / 21:00", group: "Gruppe B / Toronto",
     kickoff: "2026-06-12T21:00:00+02:00", matchday: "1",
     home: "Kanada", away: "Bosnien-Herzegowina", homeFlag: "&#x1F1E8;&#x1F1E6;", awayFlag: "&#x1F1E7;&#x1F1E6;",
-    crowd: "2:1", crowdPercent: 57, odds: [1.92, 3.55, 3.85], cooper: "2:1", confidence: 51
+    crowd: "2:1", crowdPercent: 57
   }
 ];
 let matches = [...demoMatches];
@@ -38,6 +38,27 @@ const ruleTypeNames = {
   away_goals: "Richtige Tore Ausw\u00e4rtsteam",
   goal_difference: "Richtiger Torunterschied"
 };
+const botStrategyNames = {
+  dog: "DOG-TIP / Zufall",
+  rank: "RANK-TIP / FIFA-Rangliste",
+  stat: "STAT-TIP / Rang + Tormodell"
+};
+const rankingSnapshotDate = "19. November 2025";
+const fifaRank = {
+  "spanien": 1, "argentinien": 2, "argentina": 2, "frankreich": 3, "england": 4,
+  "brasilien": 5, "portugal": 6, "niederlande": 7, "belgien": 8, "deutschland": 9,
+  "kroatien": 10, "marokko": 11, "italien": 12, "kolumbien": 13, "usa": 14,
+  "vereinigte staaten": 14, "mexiko": 15, "uruguay": 16, "schweiz": 17, "japan": 18,
+  "senegal": 19, "tschechien": 19, "iran": 20, "danemark": 21, "sudkorea": 22,
+  "ecuador": 23, "osterreich": 24, "turkei": 25, "australien": 26, "kanada": 27,
+  "ukraine": 28, "norwegen": 29, "panama": 30, "polen": 31, "wales": 32,
+  "algerien": 33, "agypten": 34, "schottland": 35, "serbien": 36, "paraguay": 37,
+  "tunesien": 38, "elfenbeinkuste": 39, "cote d'ivoire": 39, "nigeria": 40,
+  "kamerun": 41, "costa rica": 42, "katar": 43, "saudi-arabien": 44,
+  "saudi arabien": 44, "sudafrika": 45, "irak": 46, "jamaika": 47, "honduras": 48,
+  "usbekistan": 49, "neuseeland": 50, "jordanien": 51, "kap verde": 52,
+  "curacao": 53, "bosnien-herzegowina": 70, "bosnien und herzegowina": 70
+};
 const teamBonusDefaults = [
   { id: "team-match", criterion: "team_best_match", name: "Bestes Team je Spiel", points: 1, locked: true, teamRule: true },
   { id: "team-matchday", criterion: "team_best_matchday", name: "Bestes Team je Spieltag", points: 1, locked: true, teamRule: true }
@@ -56,14 +77,10 @@ let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
 let teamScoreSummary = {};
 let leaguePredictions = {};
+let fantasyPicks = [];
+let profileStandings = [];
 const matchesList = document.querySelector("#matches-list");
 const toast = document.querySelector("#toast");
-
-function fairProbabilities(odds) {
-  const raw = odds.map((odd) => 1 / odd);
-  const total = raw.reduce((sum, value) => sum + value, 0);
-  return raw.map((value) => Math.round((value / total) * 100));
-}
 
 function formatMatchTime(value) {
   const date = new Date(value);
@@ -129,7 +146,6 @@ async function loadOpenLigaMatches() {
 function renderMatches() {
   matchesList.innerHTML = matches.map((match) => {
     const tip = savedTips[match.id] || {};
-    const probabilities = fairProbabilities(match.odds);
     const open = isMatchOpen(match);
     return `
       <article class="match-card ${open ? "" : "match-locked"}" data-match="${match.id}" data-kickoff="${match.kickoff}">
@@ -146,21 +162,22 @@ function renderMatches() {
         <div class="match-insights">
           <div class="community-note">Community: <strong>${match.crowd}</strong> / ${match.crowdPercent}% sehen ${match.home} vorn</div>
           <div class="cooper-pick">
-            <span class="cooper-badge">C</span>
-            <span><small>COOPER tippt</small><strong>${match.cooper}</strong></span>
-            <span class="confidence">${match.confidence}% Sicherheit</span>
+            <span class="cooper-badge">A</span>
+            <span><small>Auto-Tipper</small><strong>DOG / RANK / STAT</strong></span>
+            <span class="confidence">${open ? "Tipps bis Anpfiff geheim" : "Tipps sichtbar"}</span>
           </div>
         </div>
-        <div class="odds-strip">
-          <span><small>1</small><b>${match.odds[0].toFixed(2)}</b><i>${probabilities[0]}%</i></span>
-          <span><small>X</small><b>${match.odds[1].toFixed(2)}</b><i>${probabilities[1]}%</i></span>
-          <span><small>2</small><b>${match.odds[2].toFixed(2)}</b><i>${probabilities[2]}%</i></span>
+        <div class="model-strip">
+          <span><small>DOG</small><b>Zufall</b></span>
+          <span><small>RANK</small><b>FIFA-Rang</b></span>
+          <span><small>STAT</small><b>Tormodell</b></span>
         </div>
         ${open ? "" : '<div class="locked-label">Tipp geschlossen</div>'}
       </article>`;
   }).join("");
   document.querySelectorAll(".score-input").forEach((input) => input.addEventListener("input", updateProgress));
   updateProgress();
+  renderScorerMatches();
 }
 
 function isMatchOpen(match) {
@@ -190,8 +207,84 @@ function updateProgress() {
 }
 
 function tipForParticipant(participant, match, index) {
-  if (participant.cooper) return match.cooper;
+  if (participant.cooper) {
+    if (isMatchOpen(match)) return "\u2013";
+    const member = teams.flatMap((team) => team.members).find((item) => item.id === participant.id);
+    return member ? botTip(member, match) : "\u2013";
+  }
   return leaguePredictions[participant.name]?.[match.id] || "\u2013";
+}
+
+function seededNumber(value) {
+  let hash = 2166136261;
+  for (const character of String(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function normalizedTeamName(name) {
+  return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function rankFor(teamName) {
+  const normalized = normalizedTeamName(teamName);
+  if (fifaRank[normalized]) return fifaRank[normalized];
+  const alias = Object.keys(fifaRank).find((name) => normalized.includes(name) || name.includes(normalized));
+  return alias ? fifaRank[alias] : 55;
+}
+
+function rankTip(match) {
+  const difference = rankFor(match.away) - rankFor(match.home);
+  if (Math.abs(difference) <= 5) return "1:1";
+  if (difference > 0) return difference >= 25 ? "2:0" : "2:1";
+  return difference <= -25 ? "0:2" : "1:2";
+}
+
+function poissonProbability(goals, expected) {
+  let factorial = 1;
+  for (let value = 2; value <= goals; value += 1) factorial *= value;
+  return (Math.exp(-expected) * (expected ** goals)) / factorial;
+}
+
+function statTip(match) {
+  const rankGap = rankFor(match.away) - rankFor(match.home);
+  const homeExpected = Math.max(0.35, Math.min(2.8, 1.3 + (rankGap * 0.018)));
+  const awayExpected = Math.max(0.35, Math.min(2.8, 1.15 - (rankGap * 0.018)));
+  let best = { home: 0, away: 0, probability: -1 };
+  for (let home = 0; home <= 6; home += 1) {
+    for (let away = 0; away <= 6; away += 1) {
+      const probability = poissonProbability(home, homeExpected) * poissonProbability(away, awayExpected);
+      if (probability > best.probability) best = { home, away, probability };
+    }
+  }
+  return `${best.home}:${best.away}`;
+}
+
+function dogTip(match, seed) {
+  const options = ["0:0", "1:0", "0:1", "1:1", "2:0", "0:2", "2:1", "1:2", "2:2", "3:1", "1:3"];
+  return options[Math.floor(seededNumber(`${match.id}-${seed}`) * options.length)];
+}
+
+function botTip(member, match) {
+  const strategy = member.strategy === "cooper" ? "stat" : (member.strategy || "dog");
+  if (strategy === "stat") return statTip(match);
+  if (strategy === "rank") return rankTip(match);
+  return dogTip(match, member.id);
+}
+
+function allBotPredictions() {
+  return teams.flatMap((team) => team.members.filter((member) => member.bot).flatMap((member) =>
+    matches.filter(isMatchOpen).map((match) => {
+      const [home, away] = botTip(member, match).split(":").map(Number);
+      return {
+        botId: member.id, botName: member.name, teamId: team.id,
+        matchId: String(match.id), home, away,
+        strategy: member.strategy === "cooper" ? "stat" : (member.strategy || "dog")
+      };
+    })
+  ));
 }
 
 function currentParticipants() {
@@ -203,6 +296,45 @@ function currentParticipants() {
     cooper: member.bot,
     team: team.name
   })));
+}
+
+function fantasyStorageKey() {
+  return `tippradar26-fantasy-${window.TippRadarCloud?.activeProfile?.id || "local"}`;
+}
+
+function renderFantasyPicks() {
+  const container = document.querySelector("#fantasy-picks");
+  if (!container) return;
+  const picksBySlot = Object.fromEntries(fantasyPicks.map((pick) => [Number(pick.slot), pick]));
+  container.innerHTML = Array.from({ length: 5 }, (_, index) => {
+    const slot = index + 1;
+    const pick = picksBySlot[slot] || {};
+    return `<label class="fantasy-pick">
+      <span>${slot}</span>
+      <input data-fantasy-player="${slot}" type="text" maxlength="50" value="${escapeHtml(pick.player_name || "")}" placeholder="Spielername">
+      <input data-fantasy-team="${slot}" type="text" maxlength="40" value="${escapeHtml(pick.national_team || "")}" placeholder="Nationalmannschaft">
+    </label>`;
+  }).join("");
+  document.querySelector("#fantasy-counter").textContent = `${fantasyPicks.length} / 5 gew\u00e4hlt`;
+}
+
+function collectFantasyPicks() {
+  return Array.from({ length: 5 }, (_, index) => {
+    const slot = index + 1;
+    return {
+      slot,
+      player_name: document.querySelector(`[data-fantasy-player="${slot}"]`).value.trim(),
+      national_team: document.querySelector(`[data-fantasy-team="${slot}"]`).value.trim()
+    };
+  }).filter((pick) => pick.player_name || pick.national_team);
+}
+
+function renderScorerMatches() {
+  const select = document.querySelector("#scorer-match");
+  if (!select) return;
+  select.innerHTML = matches.map((match) =>
+    `<option value="${match.id}">${escapeHtml(match.home)} - ${escapeHtml(match.away)}${match.result ? ` (${match.result})` : ""}</option>`
+  ).join("");
 }
 
 function renderTipMatrix() {
@@ -222,7 +354,7 @@ function renderTipMatrix() {
             <span class="matrix-person">
               <i class="mini-avatar ${participant.color}">${participant.initials}</i>
               <strong>${participant.name}</strong>
-              ${participant.cooper ? "<small>Quoten</small>" : ""}
+              ${participant.cooper ? "<small>Auto-Tipp</small>" : ""}
             </span>
           </th>`).join("")}
       </tr>
@@ -256,7 +388,7 @@ function renderTeams() {
       <div class="empty-teams">
         <span class="empty-ball">&#9673;</span>
         <h2>Noch keine Teams angelegt</h2>
-        <p>Starte mit eurem ersten Team. Danach kannst du Menschen oder einen Quoten-Spieler wie COOPER hinzuf&uuml;gen.</p>
+        <p>Starte mit eurem ersten Team. Danach kannst du Menschen oder kostenlose automatische Tipp-Spieler hinzuf&uuml;gen.</p>
         <button class="primary-button" data-action="open-team">Erstes Team anlegen</button>
       </div>`;
     return;
@@ -276,7 +408,12 @@ function renderTeams() {
         </div>
         <div class="player-form" hidden>
           <input data-field="player-name" type="text" maxlength="24" placeholder="Name des Spielers">
-          <select data-field="player-type"><option value="human">Mensch</option><option value="bot">Quoten-Spieler wie COOPER</option></select>
+          <select data-field="player-type"><option value="human">Mensch</option><option value="bot">Automatischer Tipp-Spieler</option></select>
+          <select data-field="bot-strategy" hidden>
+            <option value="dog">DOG-TIP / Zufallsprinzip</option>
+            <option value="rank">RANK-TIP / FIFA-Rangliste</option>
+            <option value="stat">STAT-TIP / Rangliste + Tormodell</option>
+          </select>
           <button data-action="create-player">Hinzuf&uuml;gen</button>
         </div>
         <div class="team-members">
@@ -284,7 +421,7 @@ function renderTeams() {
             <div class="member-admin" data-member-id="${member.id}">
               <span class="member-position">${index + 1}</span>
               <span class="mini-avatar ${member.bot ? "cooper-avatar" : "blue"}">${member.initials}</span>
-              <span class="member-name"><strong>${escapeHtml(member.name)}</strong>${member.bot ? "<small>QUOTEN-SPIELER</small>" : "<small>SPIELER</small>"}</span>
+              <span class="member-name"><strong>${escapeHtml(member.name)}</strong>${member.bot ? `<small>${botStrategyNames[member.strategy === "cooper" ? "stat" : (member.strategy || "dog")]}</small>` : "<small>SPIELER</small>"}</span>
               <label class="weight-control">
                 <span>Faktor <b>${member.weight.toFixed(2)}</b></span>
                 <input type="range" min="0.75" max="1.25" step="0.05" value="${member.weight}" data-action="weight">
@@ -393,12 +530,20 @@ function showView(name) {
 function renderRanking() {
   const body = document.querySelector("#ranking-body");
   if (!body) return;
-  const participants = currentParticipants();
+  const pointsByName = Object.fromEntries(profileStandings.map((profile) => [
+    profile.display_name, {
+      total: Number(profile.tipPoints || 0) + Number(profile.fantasyPoints || 0),
+      fantasy: Number(profile.fantasyPoints || 0)
+    }
+  ]));
+  const participants = currentParticipants().map((participant) => ({
+    ...participant, points: pointsByName[participant.name] || { total: 0, fantasy: 0 }
+  })).sort((a, b) => b.points.total - a.points.total);
   body.innerHTML = participants.length ? participants.map((participant, index) => `
     <tr class="${participant.cooper ? "cooper-row" : ""}">
       <td><b class="rank-number">${index + 1}</b></td>
       <td><span class="mini-avatar ${participant.color}">${participant.initials}</span><strong>${escapeHtml(participant.name)}</strong><small> ${escapeHtml(participant.team)}</small></td>
-      <td><span class="trend flat">&ndash;</span></td><td>0</td><td><strong>0</strong></td>
+      <td><span class="trend flat">${participant.points.fantasy ? `Top 5 +${participant.points.fantasy}` : "&ndash;"}</span></td><td>0</td><td><strong>${participant.points.total}</strong></td>
     </tr>`).join("") : `
     <tr><td colspan="5" class="ranking-empty">Noch keine Spieler angelegt. Die Rangliste f&uuml;llt sich mit eurer Runde.</td></tr>`;
 }
@@ -475,6 +620,30 @@ document.querySelector("#save-tips").addEventListener("click", async () => {
   showToast("Tipps gespeichert", "Viel Erfolg!");
 });
 
+document.querySelector("#save-fantasy-picks").addEventListener("click", async () => {
+  const picks = collectFantasyPicks();
+  if (picks.some((pick) => !pick.player_name || !pick.national_team)) {
+    showToast("Auswahl unvollst\u00e4ndig", "Bitte bei jeder Auswahl Spieler und Nationalmannschaft angeben.");
+    return;
+  }
+  const duplicate = picks.find((pick, index) =>
+    picks.findIndex((other) => other.player_name.toLowerCase() === pick.player_name.toLowerCase()) !== index
+  );
+  if (duplicate) {
+    showToast("Spieler doppelt gew\u00e4hlt", "Jeder Spieler darf pro Profil nur einmal vorkommen.");
+    return;
+  }
+  try {
+    if (window.TippRadarCloud?.league) await window.TippRadarCloud.saveFantasyPicks(picks);
+    fantasyPicks = picks;
+    localStorage.setItem(fantasyStorageKey(), JSON.stringify(picks));
+    renderFantasyPicks();
+    showToast("Top 5 gespeichert", `${picks.length} Spieler sind f\u00fcr dieses Profil ausgew\u00e4hlt.`);
+  } catch (error) {
+    showToast("Top 5 nicht gespeichert", error.message);
+  }
+});
+
 function openTeamCreator() {
   const creator = document.querySelector("#team-creator");
   creator.hidden = false;
@@ -525,13 +694,17 @@ document.querySelector("#team-grid").addEventListener("click", (event) => {
       return;
     }
     const bot = card.querySelector('[data-field="player-type"]').value === "bot";
-    team.members.push({ id: makeId("player"), name, initials: initialsFor(name), bot, weight: 1 });
+    const strategy = bot ? card.querySelector('[data-field="bot-strategy"]').value : null;
+    team.members.push({ id: makeId("player"), name, initials: initialsFor(name), bot, strategy, weight: 1 });
     persistTeams();
     renderTeams();
     renderTipMatrix();
     renderRanking();
     renderRankChart();
     showToast(`${name} hinzugef\u00fcgt`, `Faktor 1,00 in ${team.name}`);
+    if (bot && window.TippRadarCloud?.league?.role === "organizer") {
+      window.TippRadarCloud.saveBotPredictions(allBotPredictions()).catch(() => {});
+    }
   }
   if (action === "delete-player") {
     const memberRow = actionButton.closest("[data-member-id]");
@@ -555,6 +728,11 @@ document.querySelector("#team-grid").addEventListener("click", (event) => {
 });
 
 document.querySelector("#team-grid").addEventListener("change", (event) => {
+  if (event.target.dataset.field === "player-type") {
+    const strategy = event.target.closest(".player-form").querySelector('[data-field="bot-strategy"]');
+    strategy.hidden = event.target.value !== "bot";
+    return;
+  }
   if (event.target.dataset.action !== "weight") return;
   const card = event.target.closest("[data-team-id]");
   const row = event.target.closest("[data-member-id]");
@@ -618,10 +796,18 @@ function updateAccountUi() {
     document.querySelector("#account-status").textContent = "Runde ausw\u00e4hlen";
     setAccountPanel("cloud-onboarding");
   } else {
-    document.querySelector("#account-name").textContent = cloud.league.displayName;
+    document.querySelector("#account-name").textContent = cloud.activeProfile?.display_name || cloud.league.displayName;
     document.querySelector("#account-status").textContent = cloud.league.name;
     document.querySelector("#cloud-league-name").textContent = cloud.league.name;
     document.querySelector("#cloud-invite-code").textContent = cloud.league.inviteCode;
+    document.querySelector("#scorer-admin").hidden = cloud.league.role !== "organizer";
+    const ownedProfiles = cloud.profiles.filter((profile) => profile.account_user_id === cloud.session.user.id);
+    document.querySelector("#current-account-type").value = cloud.league.accountType;
+    const profileSelect = document.querySelector("#active-profile");
+    profileSelect.innerHTML = ownedProfiles.map((profile) =>
+      `<option value="${profile.id}" ${profile.id === cloud.activeProfile?.id ? "selected" : ""}>${escapeHtml(profile.display_name)}${profile.profile_type === "child" ? " / Kind" : ""}</option>`
+    ).join("");
+    document.querySelector("#family-profile-creator").hidden = cloud.league.accountType !== "family";
     setAccountPanel("cloud-account");
   }
 }
@@ -629,8 +815,9 @@ function updateAccountUi() {
 async function syncFromCloud() {
   const cloud = window.TippRadarCloud;
   if (!cloud?.league) return;
-  const [state, cloudTips, cloudTeamScores, allTips] = await Promise.all([
-    cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores(), cloud.loadLeaguePredictions()
+  const [state, cloudTips, cloudTeamScores, allTips, cloudFantasy, standings] = await Promise.all([
+    cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores(), cloud.loadLeaguePredictions(),
+    cloud.loadFantasyPicks(), cloud.loadStandings()
   ]);
   if (state) {
     teams = Array.isArray(state.teams) ? state.teams : teams;
@@ -642,10 +829,12 @@ async function syncFromCloud() {
   savedTips = cloudTips;
   teamScoreSummary = cloudTeamScores;
   leaguePredictions = allTips;
-  if (cloud.league?.displayName) {
-    leaguePredictions[cloud.league.displayName] ||= {};
+  fantasyPicks = cloudFantasy;
+  profileStandings = standings;
+  if (cloud.activeProfile?.display_name) {
+    leaguePredictions[cloud.activeProfile.display_name] ||= {};
     Object.entries(cloudTips).forEach(([matchId, tip]) => {
-      leaguePredictions[cloud.league.displayName][matchId] = `${tip.home}:${tip.away}`;
+      leaguePredictions[cloud.activeProfile.display_name][matchId] = `${tip.home}:${tip.away}`;
     });
   }
   localStorage.setItem(storageKey, JSON.stringify(savedTips));
@@ -654,6 +843,8 @@ async function syncFromCloud() {
   renderMatches();
   renderTipMatrix();
   renderRanking();
+  renderFantasyPicks();
+  updateAccountUi();
 }
 
 async function initializeCloud() {
@@ -662,6 +853,9 @@ async function initializeCloud() {
     updateAccountUi();
     await syncFromCloud();
     if (window.TippRadarCloud?.league?.role === "organizer") await loadOpenLigaMatches();
+    if (window.TippRadarCloud?.league?.role === "organizer") {
+      await window.TippRadarCloud.saveBotPredictions(allBotPredictions());
+    }
   } catch (error) {
     showToast("Cloud nicht erreichbar", "Die App arbeitet vorerst lokal weiter.");
   }
@@ -693,6 +887,7 @@ document.querySelector("#join-league").addEventListener("click", async () => {
   if (!displayName || !code) return showToast("Angaben fehlen", "Name und Einladungscode werden ben\u00f6tigt.");
   try {
     await window.TippRadarCloud.joinLeague(code, displayName);
+    await window.TippRadarCloud.ensurePrimaryProfile(document.querySelector("#account-type").value);
     updateAccountUi();
     await syncFromCloud();
     showToast("Willkommen in der Runde", window.TippRadarCloud.league.name);
@@ -707,11 +902,61 @@ document.querySelector("#create-league").addEventListener("click", async () => {
   if (!displayName || !leagueName || !code) return showToast("Angaben fehlen", "Bitte alle drei Felder ausf\u00fcllen.");
   try {
     await window.TippRadarCloud.createLeague(leagueName, code, displayName);
+    await window.TippRadarCloud.ensurePrimaryProfile(document.querySelector("#account-type").value);
     updateAccountUi();
     await window.TippRadarCloud.saveState(teams, scoringRules);
     showToast("Tipprunde erstellt", `Einladungscode: ${code.toUpperCase()}`);
   } catch (error) {
     showToast("Erstellen fehlgeschlagen", error.message);
+  }
+});
+document.querySelector("#active-profile").addEventListener("change", async (event) => {
+  window.TippRadarCloud.selectProfile(event.target.value);
+  await syncFromCloud();
+  showToast("Profil gewechselt", `${window.TippRadarCloud.activeProfile.display_name} tippt jetzt.`);
+});
+document.querySelector("#current-account-type").addEventListener("change", async (event) => {
+  try {
+    await window.TippRadarCloud.ensurePrimaryProfile(event.target.value);
+    updateAccountUi();
+    showToast("Kontoart ge\u00e4ndert", event.target.value === "family" ? "Du kannst jetzt Kinderprofile anlegen." : "Das Hauptprofil bleibt aktiv.");
+  } catch (error) {
+    showToast("Kontoart nicht ge\u00e4ndert", error.message);
+  }
+});
+document.querySelector("#add-family-profile").addEventListener("click", async () => {
+  const input = document.querySelector("#family-profile-name");
+  const name = input.value.trim();
+  if (!name) return showToast("Name fehlt", "Bitte gib den Namen des Kindes ein.");
+  try {
+    await window.TippRadarCloud.addFamilyProfile(name);
+    input.value = "";
+    updateAccountUi();
+    await syncFromCloud();
+    showToast("Kinderprofil angelegt", `${name} kann jetzt eigene Tipps abgeben.`);
+  } catch (error) {
+    showToast("Profil nicht angelegt", error.message);
+  }
+});
+document.querySelector("#save-scorer").addEventListener("click", async () => {
+  const matchId = document.querySelector("#scorer-match").value;
+  const player = document.querySelector("#scorer-player").value.trim();
+  const team = document.querySelector("#scorer-team").value.trim();
+  const goals = Number(document.querySelector("#scorer-goals").value || 0);
+  if (!matchId || !player || !team || goals < 1) {
+    showToast("Angaben fehlen", "Spiel, Torsch\u00fctze, Mannschaft und Tore werden ben\u00f6tigt.");
+    return;
+  }
+  try {
+    await window.TippRadarCloud.recordPlayerEvent(matchId, player, team, goals);
+    const match = matches.find((item) => String(item.id) === String(matchId));
+    if (match?.result) {
+      const [home, away] = match.result.split(":").map(Number);
+      await window.TippRadarCloud.scoreMatch(match.id, match.matchday, home, away);
+    }
+    showToast("Torsch\u00fctze gespeichert", `${player}: ${goals} Tor${goals === 1 ? "" : "e"}`);
+  } catch (error) {
+    showToast("Nicht gespeichert", error.message);
   }
 });
 document.querySelector("#sign-out").addEventListener("click", async () => {
@@ -741,6 +986,9 @@ renderTipMatrix();
 renderTeams();
 renderRules();
 renderRanking();
+fantasyPicks = JSON.parse(localStorage.getItem(fantasyStorageKey()) || "[]");
+renderFantasyPicks();
+renderScorerMatches();
 updateCountdown();
 loadOpenLigaMatches();
 initializeCloud();
