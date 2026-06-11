@@ -7,6 +7,10 @@ Im SQL Editor nacheinander vollstaendig ausfuehren:
 1. `01-migration-bot-strategies.sql`
 2. `02-migration-family-top5.sql`
 3. `03-migration-family-roles.sql`
+4. `04-migration-family-auto-profiles.sql`
+5. `05-migration-profile-role-editor.sql`
+6. `06-migration-profile-name-editor.sql`
+7. `07-migration-strict-profile-access.sql`
 
 `Success. No rows returned` ist jeweils die erwartete Rueckmeldung.
 
@@ -37,3 +41,5 @@ Bei `Family` kann die eingeladene Person anschliessend Kinderprofile ohne weiter
 
 Wichtig: Der Anzeigename jedes Profils muss dem Namen entsprechen, den der Organisator unter `Teams & Spieler` angelegt hat.
 Teamname, Teamfarbe und die Rolle `Team-Lead`, `Erwachsen` oder `Kind` werden in Tippvergleich und Rangliste angezeigt.
+
+Der Benutzer, der die Tipprunde erstellt hat, ist automatisch der Organisator. Sein Name wird im Kontofenster angezeigt. Nur dieses Konto kann die Bewertungskategorien und Punktzahlen aendern.

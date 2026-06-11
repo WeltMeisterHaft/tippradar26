@@ -3,13 +3,16 @@
 ## Kontoarten
 
 - **Single:** Eine E-Mail und ein Tipp-Profil.
-- **Family:** Eine E-Mail fuer das Hauptprofil und zusaetzliche Erwachsenen- oder Kinderprofile.
+- **Family:** Der Team-Lead verwaltet mit seiner E-Mail das eigene Profil und die Kinderprofile.
+- Weitere Erwachsene treten mit einer eigenen E-Mail bei und koennen nur ihr eigenes Profil tippen.
 - Bestehende Konten koennen im Kontofenster von **Single** auf **Family** umgestellt werden.
 - Im Kontofenster wird vor dem Tippen ueber **Wer tippt gerade?** das aktive Profil gewaehlt.
 - Jedes Profil besitzt eigene Tipps, Punkte und eine eigene Top-5-Auswahl.
-- Weitere Erwachsene und Kinder benoetigen keine eigene E-Mail-Adresse.
+- Kinder benoetigen keine eigene E-Mail-Adresse; Erwachsene dagegen immer.
 - Das Hauptprofil eines Family-Kontos wird als **Team-Lead** gekennzeichnet.
 - Teamname, Teamfarbe und Rolle sind im Tippvergleich und in der Rangliste sichtbar.
+- Der Family-Lead kann bei **Wer tippt gerade?** das eigene Profil oder ein Kinderprofil waehlen und dessen Tippmodus auf **DOG**, **RANK**, **STAT** oder wieder **Manuell** stellen.
+- Die Automatik ersetzt nur Tipps fuer noch offene Spiele.
 
 Der Organisator ordnet Haupt- und Kinderprofile wie bisher ueber den identischen Anzeigenamen einem Wertungsteam zu.
 
@@ -30,5 +33,6 @@ Die SQL-Dateien im Supabase-Paket in dieser Reihenfolge ausfuehren:
 1. `01-migration-bot-strategies.sql`
 2. `02-migration-family-top5.sql`
 3. `03-migration-family-roles.sql`
+4. `04-migration-family-auto-profiles.sql`
 
 Beide Migrationen sind fuer eine bereits laufende TippRadar-Datenbank vorgesehen.

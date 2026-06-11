@@ -241,22 +241,12 @@
 
         <section class="rules-card">
           <div class="rules-heading">
-            <div><span class="section-kicker">Punktevergabe</span><h2>Eure Bewertungskategorien</h2><p>Standardregeln, individuelle Kategorien und Team-Boni gemeinsam konfigurieren.</p></div>
-            <span class="rules-lock">Bis Turnierstart &auml;nderbar</span>
+            <div><span class="section-kicker">Punktevergabe</span><h2>Eure Bewertungskategorien</h2><p>Die festgelegten Einzelregeln und Team-Boni auf einen Blick.</p></div>
+            <span class="rules-lock" id="rules-access-label">Nur Organisator</span>
           </div>
           <div class="rules-layout">
             <div>
               <div class="rule-inputs" id="rule-inputs"></div>
-              <div class="add-rule-row">
-                <select id="new-rule-type">
-                  <option value="total_goals">Richtige Gesamtzahl Tore</option>
-                  <option value="home_goals">Richtige Tore Heimteam</option>
-                  <option value="away_goals">Richtige Tore Ausw&auml;rtsteam</option>
-                  <option value="goal_difference">Richtiger Torunterschied</option>
-                </select>
-                <input id="new-rule-points" type="number" min="0" max="10" value="1" aria-label="Punkte">
-                <button class="secondary-button" id="add-rule">+ Kategorie</button>
-              </div>
             </div>
             <div class="rule-preview">
               <span class="panel-label">EURE REGELN</span>
@@ -311,15 +301,18 @@
           <h2 id="cloud-league-name">Unsere Tipprunde</h2>
           <p>Teams, Regeln und Tipps werden jetzt f&uuml;r alle Teilnehmer zentral gespeichert.</p>
           <div class="setup-hint">Einladungscode: <strong id="cloud-invite-code"></strong></div>
+          <div class="organizer-hint">Organisator: <strong id="cloud-organizer-name">wird geladen</strong></div>
           <a class="tutorial-link" href="/tutorial/" target="_blank" rel="noopener">Kurzanleitung &ouml;ffnen</a>
           <div class="profile-switcher">
             <label><span>Kontoart</span><select id="current-account-type"><option value="single">Single</option><option value="family">Family</option></select></label>
             <label><span>Wer tippt gerade?</span><select id="active-profile"></select></label>
+            <label id="profile-auto-field"><span>Tippmodus dieses Profils</span><select id="profile-auto-strategy"><option value="manual">Manuell</option><option value="dog">DOG / Zufall</option><option value="rank">RANK / FIFA-Rangliste</option><option value="stat">STAT / Rangliste + Tormodell</option></select></label>
+            <p class="profile-auto-note">Eine Auto-Variante ersetzt die Tipps aller noch offenen Spiele. Bereits angepfiffene Spiele bleiben unver&auml;ndert.</p>
             <div id="family-profile-creator" hidden>
-              <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Familienmitglieds">
-              <select id="family-profile-type"><option value="child">Kind</option><option value="adult">Erwachsene/r</option></select>
-              <button id="add-family-profile">+ Familienprofil</button>
+              <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Kindes">
+              <button id="add-family-profile">+ Kinderprofil</button>
             </div>
+            <p class="profile-access-note">Erwachsene melden sich mit eigener E-Mail an. Der Family-Team-Lead kann sein eigenes Profil und die Kinderprofile verwalten.</p>
           </div>
           <button class="secondary-button full-button" id="sign-out">Abmelden</button>
         </div>

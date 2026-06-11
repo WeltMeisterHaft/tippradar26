@@ -496,11 +496,13 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .profile-switcher label { display: grid; gap: 6px; }
 .profile-switcher label span { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .profile-switcher select, .profile-switcher input { min-width: 0; height: 42px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; }
-#family-profile-creator { display: grid; grid-template-columns: 1fr 125px auto; gap: 8px; }
+.profile-auto-note { margin: -5px 1px 2px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+#family-profile-creator { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 #family-profile-creator[hidden] { display: none; }
 #family-profile-creator button, #family-profile-creator select { min-width: 0; height: 42px; border-radius: 8px; }
 #family-profile-creator button { border: 0; padding: 0 12px; color: var(--ink); background: var(--lime); font-weight: 800; cursor: pointer; }
 #family-profile-creator select { padding: 0 9px; border: 1px solid var(--line); background: white; }
+.profile-access-note { margin: -4px 1px 2px; color: #596b61; font-size: 9px; line-height: 1.45; }
 
 .chart-card { margin-top: 28px; padding: 26px 28px 20px; border-radius: 22px; color: white; background: linear-gradient(145deg, #10271e, #07130f); box-shadow: 0 28px 70px rgba(5,24,17,.13); }
 .chart-header { display: flex; align-items: end; justify-content: space-between; }
@@ -607,6 +609,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .team-members > div.discarded { opacity: .46; background: #f5f6f3; }
 .member-position { color: var(--muted); font-size: 10px; text-align: center; }
 .member-name { display: grid; font-size: 11px; }
+.member-name-line { display: flex; align-items: center; gap: 5px; }
+.member-edit { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; color: #617068; background: #edf1ec; font-size: 10px; cursor: pointer; }
+.member-edit:hover { color: var(--ink); background: var(--lime-soft); }
 .member-name small { color: #658500; font-size: 7px; letter-spacing: .08em; }
 .member-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .member-role-select { max-width: 100px; height: 21px; padding: 0 18px 0 6px; border: 1px solid #d7ddd6; border-radius: 10px; color: var(--ink); background: white; font-size: 8px; font-weight: 800; cursor: pointer; }
@@ -630,6 +635,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .creator-note { margin: 14px 0 0; color: var(--muted); font-size: 10px; }
 .rules-card { padding: 24px; }
 .rules-lock { padding: 7px 9px; border-radius: 6px; color: #7b5d3e; background: #f4e8d9; font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
+.organizer-hint { margin-top: 8px; padding: 8px 11px; border-radius: 8px; color: #4d6800; background: var(--lime-soft); font-size: 10px; }
+.rules-readonly .rule-inputs input:disabled { color: var(--ink); background: #f1f3ef; opacity: 1; }
+.rules-readonly .rules-lock { color: #6a7280; background: #e9ece8; }
 .rules-layout { display: grid; grid-template-columns: 1fr 300px; gap: 28px; margin-top: 22px; }
 .rule-inputs { display: grid; gap: 8px; }
 .rule-inputs label { min-height: 52px; display: grid; grid-template-columns: 1fr 65px 45px; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px; }
@@ -637,7 +645,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .rule-inputs input { width: 65px; height: 36px; border: 1px solid var(--line); border-radius: 7px; text-align: center; font: 800 15px "Manrope"; }
 .rule-inputs small { color: var(--muted); font-size: 9px; }
 .rule-dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 3px; }
-.rule-dot.exact { background: var(--lime); }.rule-dot.difference { background: #8eb7f0; }.rule-dot.tendency { background: var(--violet); }.rule-dot.wrong { background: #d9ddda; }
+.rule-dot.exact { background: var(--lime); }.rule-dot.difference { background: #8eb7f0; }.rule-dot.tendency { background: var(--violet); }
 .rule-dot.team-bonus { background: #ff9d54; box-shadow: 0 0 0 3px rgba(255,157,84,.14); }
 .team-rule-label { margin-left: 7px; padding: 3px 5px; border-radius: 4px; color: #9a4d13 !important; background: #fff0e4; font-size: 7px !important; letter-spacing: .08em; }
 .rule-preview { padding: 18px; border-radius: 14px; color: white; background: var(--ink); }
@@ -647,6 +655,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .check-option { display: flex; align-items: center; gap: 8px; font-size: 11px; }
 .check-option input { accent-color: #789d0c; }
 .secondary-button { min-height: 42px; padding: 0 16px; border: 1px solid var(--ink); border-radius: 9px; color: white; background: var(--ink); font-weight: 700; cursor: pointer; }
+.save-button:disabled { cursor: not-allowed; opacity: .48; }
+.auto-label { color: #4d6800; background: var(--lime-soft); }
 .empty-teams { grid-column: 1 / -1; min-height: 290px; padding: 45px 24px; display: grid; place-items: center; align-content: center; text-align: center; border: 1px dashed #cbd1ca; border-radius: 24px; background: rgba(255,253,247,.65); }
 .empty-teams h2 { margin: 14px 0 5px; font: 800 24px "Manrope"; }
 .empty-teams p { max-width: 470px; margin: 0; color: var(--muted); line-height: 1.55; }
@@ -680,9 +690,6 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .rules-heading p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
 .rule-inputs label { position: relative; grid-template-columns: 1fr 65px 45px 28px; }
 .rule-delete { width: 26px; height: 26px; border: 0; border-radius: 50%; color: #a24d40; background: #fff0ed; cursor: pointer; }
-.add-rule-row { display: grid; grid-template-columns: 1fr 70px auto; gap: 8px; margin-top: 10px; }
-.add-rule-row input, .add-rule-row select { min-width: 0; height: 42px; padding: 0 11px; border: 1px dashed #bfc6bd; border-radius: 9px; background: #fbfcf9; }
-.add-rule-row input[type="number"] { text-align: center; font-weight: 800; }
 .rule-preview h3 { margin: 20px 0 8px; font: 800 26px "Manrope"; color: var(--lime); }
 .rule-preview p { color: #91a198; font-size: 11px; line-height: 1.55; }
 .rule-total { margin-top: 24px; display: flex; justify-content: space-between; align-items: center; padding-top: 15px; border-top: 1px solid rgba(255,255,255,.1); font-size: 11px; }
@@ -768,8 +775,6 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
   .team-head-right { align-items: end; flex-direction: column; gap: 6px; }
   .member-admin .weight-control { grid-column: 2 / 4; }
   .member-admin .member-delete { grid-column: 4; grid-row: 1; }
-  .add-rule-row { grid-template-columns: 1fr 58px; }
-  .add-rule-row .secondary-button { grid-column: 1 / -1; }
   .hero-metrics { gap: 15px; }
   .ranking-table th, .ranking-table td { padding-left: 10px; padding-right: 10px; }
   .mobile-nav {

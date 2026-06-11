@@ -27,17 +27,10 @@ let scoringRules = JSON.parse(localStorage.getItem(ruleStorageKey) || "null") ||
   { id: "exact", criterion: "exact", name: "Exaktes Ergebnis", points: 4, locked: true },
   { id: "difference", criterion: "goal_difference", name: "Richtige Tordifferenz", points: 3, locked: true },
   { id: "tendency", criterion: "tendency", name: "Richtige Tendenz", points: 2, locked: true },
-  { id: "goals", criterion: "total_goals", name: "Richtige Gesamtzahl Tore", points: 1 },
-  { id: "wrong", criterion: "wrong", name: "Falscher Tipp", points: 0, locked: true },
+  { id: "goals", criterion: "total_goals", name: "Richtige Gesamtzahl Tore", points: 1, locked: true },
   { id: "team-match", criterion: "team_best_match", name: "Bestes Team je Spiel", points: 1, locked: true, teamRule: true },
   { id: "team-matchday", criterion: "team_best_matchday", name: "Bestes Team je Spieltag", points: 1, locked: true, teamRule: true }
 ];
-const ruleTypeNames = {
-  total_goals: "Richtige Gesamtzahl Tore",
-  home_goals: "Richtige Tore Heimteam",
-  away_goals: "Richtige Tore Ausw\u00e4rtsteam",
-  goal_difference: "Richtiger Torunterschied"
-};
 const botStrategyNames = {
   dog: "DOG-TIP / Zufall",
   rank: "RANK-TIP / FIFA-Rangliste",
@@ -65,6 +58,12 @@ const teamBonusDefaults = [
 ];
 
 function ensureTeamBonusRules() {
+  scoringRules = scoringRules.filter((rule) => rule.criterion !== "wrong" && rule.id !== "wrong");
+  scoringRules.forEach((rule) => {
+    if (["exact", "goal_difference", "tendency", "total_goals", "team_best_match", "team_best_matchday"].includes(rule.criterion)) {
+      rule.locked = true;
+    }
+  });
   teamBonusDefaults.forEach((defaultRule) => {
     if (!scoringRules.some((rule) => rule.criterion === defaultRule.criterion)) {
       scoringRules.push({ ...defaultRule });
@@ -130,6 +129,11 @@ async function loadOpenLigaMatches() {
     const recentBoundary = Date.now() - (6 * 60 * 60 * 1000);
     const relevant = normalized.filter((match) => new Date(match.kickoff).getTime() >= recentBoundary);
     matches = (relevant.length ? relevant : normalized.slice(-12)).slice(0, 12);
+    await syncOwnedAutomaticProfiles();
+    if (window.TippRadarCloud?.league) {
+      leaguePredictions = await window.TippRadarCloud.loadLeaguePredictions();
+      savedTips = await window.TippRadarCloud.loadPredictions();
+    }
     status.textContent = "Spielplan live von OpenLigaDB";
     status.parentElement.classList.add("connected");
     renderMatches();
@@ -151,6 +155,8 @@ async function loadOpenLigaMatches() {
 }
 
 function renderMatches() {
+  const activeAutoStrategy = window.TippRadarCloud?.activeProfile?.auto_strategy || "manual";
+  const automatic = activeAutoStrategy !== "manual";
   matchesList.innerHTML = matches.map((match) => {
     const tip = savedTips[match.id] || {};
     const open = isMatchOpen(match);
@@ -162,9 +168,9 @@ function renderMatches() {
           <div class="match-team"><span class="small-flag">${match.awayFlag}</span>${match.away}</div>
         </div>
         <div class="score-inputs" aria-label="Ergebnis fuer ${match.home} gegen ${match.away}">
-          <input class="score-input" data-side="home" type="number" min="0" max="20" inputmode="numeric" value="${tip.home ?? ""}" aria-label="Tore ${match.home}" ${open ? "" : "disabled"}>
+          <input class="score-input" data-side="home" type="number" min="0" max="20" inputmode="numeric" value="${tip.home ?? ""}" aria-label="Tore ${match.home}" ${open && !automatic ? "" : "disabled"}>
           <span>:</span>
-          <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}" ${open ? "" : "disabled"}>
+          <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}" ${open && !automatic ? "" : "disabled"}>
         </div>
         <div class="match-insights">
           <div class="community-note">Community: <strong>${match.crowd}</strong> / ${match.crowdPercent}% sehen ${match.home} vorn</div>
@@ -179,9 +185,12 @@ function renderMatches() {
           <span><small>RANK</small><b>FIFA-Rang</b></span>
           <span><small>STAT</small><b>Tormodell</b></span>
         </div>
-        ${open ? "" : '<div class="locked-label">Tipp geschlossen</div>'}
+        ${automatic && open
+          ? `<div class="locked-label auto-label">AUTO · ${activeAutoStrategy.toUpperCase()}</div>`
+          : (open ? "" : '<div class="locked-label">Tipp geschlossen</div>')}
       </article>`;
   }).join("");
+  document.querySelector("#save-tips").disabled = automatic;
   document.querySelectorAll(".score-input").forEach((input) => input.addEventListener("input", updateProgress));
   updateProgress();
   renderScorerMatches();
@@ -281,6 +290,31 @@ function botTip(member, match) {
   return dogTip(match, member.id);
 }
 
+function automaticProfileTips(profile, strategy) {
+  return Object.fromEntries(matches.filter(isMatchOpen).map((match) => {
+    const automaticMember = { id: profile.id, strategy };
+    const [home, away] = botTip(automaticMember, match).split(":").map(Number);
+    return [String(match.id), { home, away }];
+  }));
+}
+
+async function syncOwnedAutomaticProfiles() {
+  const cloud = window.TippRadarCloud;
+  if (!cloud?.league || !cloud.session) return;
+  const ownedProfiles = cloud.profiles.filter((profile) =>
+    profile.account_user_id === cloud.session.user.id
+    && (profile.is_primary || profile.profile_type === "child")
+    && profile.auto_strategy
+    && profile.auto_strategy !== "manual"
+  );
+  await Promise.all(ownedProfiles.map((profile) =>
+    cloud.savePredictionsForProfile(
+      profile.id,
+      automaticProfileTips(profile, profile.auto_strategy)
+    )
+  ));
+}
+
 function allBotPredictions() {
   return teams.flatMap((team) => team.members.filter((member) => member.bot).flatMap((member) =>
     matches.filter(isMatchOpen).map((match) => {
@@ -312,6 +346,10 @@ function participantRole(member) {
   return profileForName(member.name)?.profile_type || member.role || "adult";
 }
 
+function profileAutoStrategy(name) {
+  return profileForName(name)?.auto_strategy || "manual";
+}
+
 function currentParticipants() {
   return teams.flatMap((team) => team.members.map((member) => ({
     id: member.id,
@@ -320,6 +358,7 @@ function currentParticipants() {
     color: member.bot ? "cooper-avatar" : "team-avatar",
     cooper: member.bot,
     role: participantRole(member),
+    autoStrategy: member.bot ? (member.strategy || "dog") : profileAutoStrategy(member.name),
     team: team.name,
     teamColor: team.color
   })));
@@ -487,6 +526,7 @@ function renderTipMatrix() {
               <strong>${participant.name}</strong>
               <span class="participant-meta">
                 <small class="role-badge ${participant.role}">${participantRoleNames[participant.role]}</small>
+                ${participant.autoStrategy !== "manual" ? `<small class="role-badge bot">AUTO · ${participant.autoStrategy.toUpperCase()}</small>` : ""}
                 <small class="team-badge" style="--team-color:${participant.teamColor}">${escapeHtml(participant.team)}</small>
               </span>
             </span>
@@ -517,6 +557,8 @@ function renderTipMatrix() {
 function renderTeams() {
   const grid = document.querySelector("#team-grid");
   if (!grid) return;
+  const canRenamePlayers = !window.TippRadarCloud?.league
+    || window.TippRadarCloud.league.role === "organizer";
   if (!teams.length) {
     grid.innerHTML = `
       <div class="empty-teams">
@@ -561,7 +603,10 @@ function renderTeams() {
               <span class="member-position">${index + 1}</span>
               <span class="mini-avatar ${member.bot ? "cooper-avatar" : "team-avatar"}" style="--team-color:${team.color}">${member.initials}</span>
               <span class="member-name">
-                <strong>${escapeHtml(member.name)}</strong>
+                <span class="member-name-line">
+                  <strong>${escapeHtml(member.name)}</strong>
+                  ${canRenamePlayers ? `<button class="member-edit" data-action="rename-player" title="Namen korrigieren" aria-label="${escapeHtml(member.name)} umbenennen">&#9998;</button>` : ""}
+                </span>
                 <span class="member-meta">
                   ${member.bot
                     ? `<small class="role-badge bot">Auto</small>`
@@ -571,6 +616,9 @@ function renderTeams() {
                         <option value="child" ${participantRole(member) === "child" ? "selected" : ""}>Kind</option>
                       </select>`}
                   <small class="team-badge" style="--team-color:${team.color}">${escapeHtml(team.name)}</small>
+                  ${!member.bot && profileAutoStrategy(member.name) !== "manual"
+                    ? `<small class="role-badge bot">AUTO · ${profileAutoStrategy(member.name).toUpperCase()}</small>`
+                    : ""}
                 </span>
                 ${member.bot ? `<small>${botStrategyNames[member.strategy === "cooper" ? "stat" : (member.strategy || "dog")]}</small>` : ""}
               </span>
@@ -652,16 +700,25 @@ function rebalanceWeights(team, changedId, requestedValue) {
 function renderRules() {
   const container = document.querySelector("#rule-inputs");
   if (!container) return;
+  const cloudConnected = Boolean(window.TippRadarCloud?.league);
+  const isOrganizer = !cloudConnected || window.TippRadarCloud.league.role === "organizer";
   container.innerHTML = scoringRules.map((rule) => `
     <label data-rule-id="${rule.id}">
       <span><i class="rule-dot ${rule.teamRule ? "team-bonus" : rule.id}"></i>${escapeHtml(rule.name)}${rule.teamRule ? "<small class=\"team-rule-label\">TEAM-BONUS</small>" : ""}</span>
-      <input type="number" min="0" max="10" value="${rule.points}" data-action="rule-points">
+      <input type="number" min="0" max="10" value="${rule.points}" data-action="rule-points" ${isOrganizer ? "" : "disabled"}>
       <small>Punkte</small>
-      ${rule.locked ? "" : `<button class="rule-delete" data-action="delete-rule" aria-label="Kategorie l&ouml;schen">&times;</button>`}
+      ${rule.locked || !isOrganizer ? "" : `<button class="rule-delete" data-action="delete-rule" aria-label="Kategorie l&ouml;schen">&times;</button>`}
     </label>`).join("");
   const total = scoringRules.filter((rule) => !rule.teamRule).reduce((sum, rule) => sum + Number(rule.points), 0);
   document.querySelector("#rule-count").textContent = `${scoringRules.length} Kategorien`;
   document.querySelector("#rule-total").textContent = `${total} Punkte`;
+  document.querySelector("#save-rules").hidden = !isOrganizer;
+  document.querySelector(".rules-footer .check-option input").disabled = !isOrganizer;
+  const accessLabel = document.querySelector("#rules-access-label");
+  accessLabel.textContent = isOrganizer
+    ? "Nur du kannst \u00e4ndern"
+    : `Gesperrt \u00b7 nur ${window.TippRadarCloud?.organizerName || "Organisator"}`;
+  document.querySelector(".rules-card").classList.toggle("rules-readonly", !isOrganizer);
 }
 
 function showToast(title, message) {
@@ -699,6 +756,7 @@ function renderRanking() {
         <strong>${escapeHtml(participant.name)}</strong>
         <span class="participant-meta">
           <small class="role-badge ${participant.role}">${participantRoleNames[participant.role]}</small>
+          ${participant.autoStrategy !== "manual" ? `<small class="role-badge bot">AUTO · ${participant.autoStrategy.toUpperCase()}</small>` : ""}
           <small class="team-badge" style="--team-color:${participant.teamColor}">${escapeHtml(participant.team)}</small>
         </span>
       </td>
@@ -877,6 +935,45 @@ document.querySelector("#team-grid").addEventListener("click", (event) => {
       window.TippRadarCloud.saveBotPredictions(allBotPredictions()).catch(() => {});
     }
   }
+  if (action === "rename-player") {
+    const memberRow = actionButton.closest("[data-member-id]");
+    const member = team.members.find((item) => item.id === memberRow.dataset.memberId);
+    const previousName = member.name;
+    const nextName = window.prompt("Neuer Spielername", previousName)?.trim();
+    if (!nextName || nextName === previousName) return;
+    const duplicate = teams.some((item) => item.members.some((candidate) =>
+      candidate.id !== member.id
+      && candidate.name.trim().toLowerCase() === nextName.toLowerCase()
+    ));
+    if (duplicate) {
+      showToast("Name bereits vorhanden", "Jeder Teilnehmername muss eindeutig sein.");
+      return;
+    }
+
+    const profile = profileForName(previousName);
+    const applyRename = () => {
+      member.name = nextName;
+      member.initials = initialsFor(nextName);
+      if (leaguePredictions[previousName]) {
+        leaguePredictions[nextName] = leaguePredictions[previousName];
+        delete leaguePredictions[previousName];
+      }
+      persistTeams();
+      renderTeams();
+      renderTipMatrix();
+      renderRanking();
+      updateAccountUi();
+      showToast("Name korrigiert", `${previousName} hei\u00dft jetzt ${nextName}.`);
+    };
+
+    if (profile && window.TippRadarCloud?.renameProfile) {
+      window.TippRadarCloud.renameProfile(profile.id, nextName)
+        .then(applyRename)
+        .catch((error) => showToast("Name nicht ge\u00e4ndert", error.message));
+    } else {
+      applyRename();
+    }
+  }
   if (action === "delete-player") {
     const memberRow = actionButton.closest("[data-member-id]");
     team.members = team.members.filter((member) => member.id !== memberRow.dataset.memberId);
@@ -949,29 +1046,25 @@ document.querySelector("#team-grid").addEventListener("change", (event) => {
 });
 
 document.querySelector("#rule-inputs").addEventListener("input", (event) => {
+  if (window.TippRadarCloud?.league && window.TippRadarCloud.league.role !== "organizer") return;
   if (event.target.dataset.action !== "rule-points") return;
   const rule = scoringRules.find((item) => item.id === event.target.closest("[data-rule-id]").dataset.ruleId);
   rule.points = Number(event.target.value || 0);
   renderRules();
 });
 document.querySelector("#rule-inputs").addEventListener("click", (event) => {
+  if (window.TippRadarCloud?.league && window.TippRadarCloud.league.role !== "organizer") return;
   const button = event.target.closest('[data-action="delete-rule"]');
   if (!button) return;
   const id = button.closest("[data-rule-id]").dataset.ruleId;
   scoringRules = scoringRules.filter((rule) => rule.id !== id);
   renderRules();
 });
-document.querySelector("#add-rule").addEventListener("click", () => {
-  const criterion = document.querySelector("#new-rule-type").value;
-  scoringRules.push({
-    id: makeId("rule"),
-    criterion,
-    name: ruleTypeNames[criterion],
-    points: Number(document.querySelector("#new-rule-points").value || 0)
-  });
-  renderRules();
-});
 document.querySelector("#save-rules").addEventListener("click", () => {
+  if (window.TippRadarCloud?.league && window.TippRadarCloud.league.role !== "organizer") {
+    showToast("Regeln gesperrt", `Nur ${window.TippRadarCloud.organizerName || "der Organisator"} kann sie \u00e4ndern.`);
+    return;
+  }
   localStorage.setItem(ruleStorageKey, JSON.stringify(scoringRules));
   if (window.TippRadarCloud?.league) {
     window.TippRadarCloud.saveState(teams, scoringRules).catch(() => {
@@ -1006,8 +1099,13 @@ function updateAccountUi() {
     document.querySelector("#account-status").textContent = cloud.league.name;
     document.querySelector("#cloud-league-name").textContent = cloud.league.name;
     document.querySelector("#cloud-invite-code").textContent = cloud.league.inviteCode;
+    document.querySelector("#cloud-organizer-name").textContent =
+      `${cloud.organizerName || "Unbekannt"}${cloud.league.role === "organizer" ? " (du)" : ""}`;
     document.querySelector("#scorer-admin").hidden = cloud.league.role !== "organizer";
-    const ownedProfiles = cloud.profiles.filter((profile) => profile.account_user_id === cloud.session.user.id);
+    const ownedProfiles = cloud.profiles.filter((profile) =>
+      profile.account_user_id === cloud.session.user.id
+      && (profile.is_primary || profile.profile_type === "child")
+    );
     document.querySelector("#current-account-type").value = cloud.league.accountType;
     const profileSelect = document.querySelector("#active-profile");
     profileSelect.innerHTML = ownedProfiles.map((profile) =>
@@ -1019,7 +1117,12 @@ function updateAccountUi() {
         return `<option value="${profile.id}" ${profile.id === cloud.activeProfile?.id ? "selected" : ""}>${escapeHtml(profile.display_name)} / ${role}${team ? ` / ${escapeHtml(team.name)}` : " / noch ohne Team"}</option>`;
       }
     ).join("");
+    const autoSelect = document.querySelector("#profile-auto-strategy");
+    autoSelect.value = cloud.activeProfile?.auto_strategy || "manual";
+    document.querySelector("#profile-auto-field").hidden = cloud.league.accountType !== "family";
+    document.querySelector(".profile-auto-note").hidden = cloud.league.accountType !== "family";
     document.querySelector("#family-profile-creator").hidden = cloud.league.accountType !== "family";
+    document.querySelector(".profile-access-note").hidden = cloud.league.accountType !== "family";
     setAccountPanel("cloud-account");
   }
 }
@@ -1034,7 +1137,11 @@ async function syncFromCloud() {
   if (state) {
     teams = Array.isArray(state.teams) ? state.teams : teams;
     scoringRules = Array.isArray(state.scoring_rules) && state.scoring_rules.length ? state.scoring_rules : scoringRules;
+    const storedRules = JSON.stringify(scoringRules);
     ensureTeamBonusRules();
+    if (cloud.league.role === "organizer" && JSON.stringify(scoringRules) !== storedRules) {
+      await cloud.saveState(teams, scoringRules);
+    }
     localStorage.setItem(teamStorageKey, JSON.stringify(teams));
     localStorage.setItem(ruleStorageKey, JSON.stringify(scoringRules));
   }
@@ -1064,7 +1171,7 @@ async function initializeCloud() {
     await window.TippRadarCloud?.init();
     updateAccountUi();
     await syncFromCloud();
-    if (window.TippRadarCloud?.league?.role === "organizer") await loadOpenLigaMatches();
+    if (window.TippRadarCloud?.league) await loadOpenLigaMatches();
     if (window.TippRadarCloud?.league?.role === "organizer") {
       await window.TippRadarCloud.saveBotPredictions(allBotPredictions());
     }
@@ -1127,6 +1234,34 @@ document.querySelector("#active-profile").addEventListener("change", async (even
   await syncFromCloud();
   showToast("Profil gewechselt", `${window.TippRadarCloud.activeProfile.display_name} tippt jetzt.`);
 });
+document.querySelector("#profile-auto-strategy").addEventListener("change", async (event) => {
+  const cloud = window.TippRadarCloud;
+  const profile = cloud.activeProfile;
+  const strategy = event.target.value;
+  if (!profile) return;
+  if (strategy !== "manual" && !window.confirm(
+    `Offene Tipps von ${profile.display_name} werden jetzt automatisch neu gesetzt. Fortfahren?`
+  )) {
+    event.target.value = profile.auto_strategy || "manual";
+    return;
+  }
+  try {
+    await cloud.setProfileAutoStrategy(profile.id, strategy);
+    if (strategy !== "manual") {
+      await cloud.savePredictionsForProfile(profile.id, automaticProfileTips(profile, strategy));
+    }
+    await syncFromCloud();
+    showToast(
+      strategy === "manual" ? "Manuelles Tippen aktiv" : "Auto-Tipper aktiv",
+      strategy === "manual"
+        ? `${profile.display_name} tippt wieder selbst.`
+        : `${profile.display_name} tippt jetzt nach ${botStrategyNames[strategy]}.`
+    );
+  } catch (error) {
+    event.target.value = profile.auto_strategy || "manual";
+    showToast("Tippmodus nicht ge\u00e4ndert", error.message);
+  }
+});
 document.querySelector("#current-account-type").addEventListener("change", async (event) => {
   try {
     await window.TippRadarCloud.ensurePrimaryProfile(event.target.value);
@@ -1139,14 +1274,13 @@ document.querySelector("#current-account-type").addEventListener("change", async
 document.querySelector("#add-family-profile").addEventListener("click", async () => {
   const input = document.querySelector("#family-profile-name");
   const name = input.value.trim();
-  const profileType = document.querySelector("#family-profile-type").value;
-  if (!name) return showToast("Name fehlt", "Bitte gib den Namen des Familienmitglieds ein.");
+  if (!name) return showToast("Name fehlt", "Bitte gib den Namen des Kindes ein.");
   try {
-    await window.TippRadarCloud.addFamilyProfile(name, profileType);
+    await window.TippRadarCloud.addFamilyProfile(name);
     input.value = "";
     updateAccountUi();
     await syncFromCloud();
-    showToast("Familienprofil angelegt", `${name} kann jetzt eigene Tipps abgeben.`);
+    showToast("Kinderprofil angelegt", `Der Team-Lead kann jetzt f\u00fcr ${name} tippen.`);
   } catch (error) {
     showToast("Profil nicht angelegt", error.message);
   }
