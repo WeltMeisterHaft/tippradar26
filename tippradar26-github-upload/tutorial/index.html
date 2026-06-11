@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#07130f">
+  <title>TippRadar 26 - Kurzanleitung</title>
+  <style>
+    :root { --ink:#07130f; --lime:#c9ff38; --paper:#f6f2e8; --muted:#68756f; --line:#d9ded7; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font:15px/1.55 Arial,sans-serif; }
+    header { padding:56px 22px; color:white; background:linear-gradient(135deg,#07130f,#173729); }
+    header div, main { width:min(920px,100%); margin:auto; }
+    .kicker { color:var(--lime); font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+    h1 { margin:8px 0 12px; font-size:clamp(38px,7vw,68px); line-height:1; letter-spacing:-.05em; }
+    header p { max-width:650px; color:#b8c4be; }
+    .back { display:inline-block; margin-top:18px; padding:11px 16px; border-radius:24px; color:var(--ink); background:var(--lime); font-weight:800; text-decoration:none; }
+    main { padding:34px 20px 70px; }
+    nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:26px; }
+    nav a { padding:8px 12px; border:1px solid var(--line); border-radius:20px; color:var(--ink); background:white; text-decoration:none; font-weight:700; }
+    section { margin:16px 0; padding:25px; border:1px solid var(--line); border-radius:20px; background:#fffdf8; }
+    h2 { margin:0 0 14px; font-size:25px; letter-spacing:-.03em; }
+    h3 { margin:22px 0 7px; font-size:16px; }
+    ol, ul { padding-left:22px; }
+    li { margin:7px 0; }
+    .note { padding:13px 15px; border-radius:10px; background:#edf6d2; }
+    .score { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+    .score div { padding:13px; border-radius:11px; background:#f0f2ed; }
+    .score strong { display:block; font-size:19px; }
+    code { padding:2px 5px; border-radius:4px; background:#edf0ea; }
+    footer { color:var(--muted); font-size:12px; text-align:center; }
+    @media(max-width:600px){ .score{grid-template-columns:1fr;} section{padding:20px;} }
+    @media print { header{padding:25px;color:var(--ink);background:white}.back,nav{display:none}section{break-inside:avoid} }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="kicker">TippRadar 26</span>
+      <h1>So funktioniert's.</h1>
+      <p>Die kurze Anleitung für Einzelspieler, Familien und Team-Leads. Anmeldung, Tipps und Top 5 dauern zusammen nur wenige Minuten.</p>
+      <a class="back" href="../index.html">Zur Tipp-App</a>
+    </div>
+  </header>
+  <main>
+    <nav>
+      <a href="#start">Erste Anmeldung</a>
+      <a href="#tippen">Tippen</a>
+      <a href="#family">Family</a>
+      <a href="#top5">Meine Top 5</a>
+      <a href="#punkte">Punkte</a>
+      <a href="#orga">Organisator</a>
+    </nav>
+
+    <section id="start">
+      <h2>1. Erste Anmeldung</h2>
+      <ol>
+        <li>Öffne <a href="../index.html">TippRadar 26</a> und klicke oben rechts auf <strong>Anmelden</strong>.</li>
+        <li>Trage deine E-Mail-Adresse ein und fordere den Anmeldelink an.</li>
+        <li>Öffne den Link aus der E-Mail. Ein Passwort ist nicht nötig.</li>
+        <li>Trage deinen Anzeigenamen und den Einladungscode ein.</li>
+        <li>Wähle <strong>Single</strong> oder <strong>Family</strong> und klicke auf <strong>Beitreten</strong>.</li>
+      </ol>
+      <p class="note"><strong>Wichtig:</strong> Verwende genau den Namen, den der Organisator für dich unter „Teams & Spieler“ eingetragen hat.</p>
+    </section>
+
+    <section id="tippen">
+      <h2>2. Ergebnisse tippen</h2>
+      <ol>
+        <li>Öffne den Bereich <strong>Tippen</strong>.</li>
+        <li>Trage für jedes offene Spiel das Ergebnis nach 90 Minuten ein.</li>
+        <li>Klicke unten auf <strong>Tipps speichern</strong>.</li>
+      </ol>
+      <p>Bis zum Anpfiff kannst du einen Tipp ändern. Danach wird das Spiel automatisch geschlossen und die Tipps der Runde werden sichtbar.</p>
+    </section>
+
+    <section id="family">
+      <h2>3. Family-Konto</h2>
+      <p>Eine Familie benötigt nur eine E-Mail-Adresse. Das Hauptprofil verwaltet die Kinderprofile.</p>
+      <ol>
+        <li>Öffne oben rechts das Kontofenster.</li>
+        <li>Stelle die Kontoart auf <strong>Family</strong>.</li>
+        <li>Lege über <strong>+ Kinderprofil</strong> die teilnehmenden Kinder an.</li>
+        <li>Wähle vor jedem Tipp unter <strong>Wer tippt gerade?</strong> das richtige Profil.</li>
+      </ol>
+      <p class="note">Jedes Profil besitzt eigene Tipps, Punkte und eine eigene Top-5-Auswahl.</p>
+    </section>
+
+    <section id="top5">
+      <h2>4. Meine Top 5</h2>
+      <ol>
+        <li>Wähle in jeder der fünf Zeilen zuerst eine Nationalmannschaft.</li>
+        <li>Danach erscheint automatisch deren aktueller Kader.</li>
+        <li>Wähle einen Spieler und wiederhole dies bis zu fünfmal.</li>
+        <li>Klicke auf <strong>Top 5 speichern</strong>.</li>
+      </ol>
+      <p>Die Auswahl gilt für das ganze Turnier und wird mit dem ersten Turnierspiel geschlossen.</p>
+    </section>
+
+    <section id="punkte">
+      <h2>5. Punkte und Teams</h2>
+      <div class="score">
+        <div><strong>4 Punkte</strong>Exaktes Ergebnis</div>
+        <div><strong>3 Punkte</strong>Richtige Tordifferenz</div>
+        <div><strong>2 Punkte</strong>Richtige Tendenz</div>
+        <div><strong>+1 Punkt</strong>Optionale Zusatzkategorie</div>
+        <div><strong>+1 je Tor</strong>Tor eines Top-5-Spielers</div>
+        <div><strong>+1 je Sieg</strong>Team eines Top-5-Spielers gewinnt</div>
+      </div>
+      <p>Die in der App angezeigten Regeln sind verbindlich. Für die Teamwertung zählen pro Spieltag die fünf punktbesten gewichteten Teilnehmer eines Teams.</p>
+    </section>
+
+    <section id="orga">
+      <h2>6. Hinweise für den Organisator</h2>
+      <ul>
+        <li>Teams und Teilnehmer vor dem Versand der Einladungen anlegen.</li>
+        <li>Anzeigenamen in App und Teamkarte müssen übereinstimmen.</li>
+        <li>Einladungscode aus dem Kontofenster weitergeben.</li>
+        <li>OpenLigaDB aktualisiert Spielplan und Ergebnisse.</li>
+        <li>API-Football liefert Kader und Torschützen automatisch.</li>
+        <li>Die Torschützen-Korrektur nur verwenden, wenn ein automatischer Eintrag fehlt.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Häufige Fragen</h2>
+      <h3>Ich habe keine Anmelde-E-Mail erhalten.</h3>
+      <p>Spam-Ordner prüfen, mindestens 60 Sekunden warten und den Link nicht mehrfach schnell hintereinander anfordern.</p>
+      <h3>Mein Kind hat kein eigenes Handy.</h3>
+      <p>Das ist kein Problem. Im Familienkonto einfach vor dem Tippen das Kinderprofil auswählen.</p>
+      <h3>Mein Tipp ist gesperrt.</h3>
+      <p>Nach dem offiziellen Anpfiff kann ein Tipp nicht mehr verändert werden.</p>
+      <h3>Der Kader erscheint nicht.</h3>
+      <p>Seite einmal neu laden. Bleibt das Problem bestehen, kurz dem Organisator Bescheid geben.</p>
+    </section>
+    <footer>TippRadar 26 · Unsere WM-Runde</footer>
+  </main>
+</body>
+</html>

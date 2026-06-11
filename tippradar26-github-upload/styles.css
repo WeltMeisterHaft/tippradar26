@@ -413,6 +413,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .account-dialog p { color: var(--muted); line-height: 1.55; }
 .account-close { position: absolute; right: 18px; top: 18px; }
 .setup-hint { margin-top: 18px; padding: 14px; border-radius: 11px; background: var(--lime-soft); font-size: 12px; }
+.tutorial-link { display: inline-block; margin-top: 12px; color: #4e6900; font-size: 12px; font-weight: 800; }
 .account-field { display: grid; gap: 6px; margin-top: 20px; }
 .account-field span { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .account-field input, .account-field select, .onboarding-options input { height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: white; }
