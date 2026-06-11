@@ -25,7 +25,9 @@ let scoringRules = JSON.parse(localStorage.getItem(ruleStorageKey) || "null") ||
   { id: "difference", criterion: "goal_difference", name: "Richtige Tordifferenz", points: 3, locked: true },
   { id: "tendency", criterion: "tendency", name: "Richtige Tendenz", points: 2, locked: true },
   { id: "goals", criterion: "total_goals", name: "Richtige Gesamtzahl Tore", points: 1 },
-  { id: "wrong", criterion: "wrong", name: "Falscher Tipp", points: 0, locked: true }
+  { id: "wrong", criterion: "wrong", name: "Falscher Tipp", points: 0, locked: true },
+  { id: "team-match", criterion: "team_best_match", name: "Bestes Team je Spiel", points: 1, locked: true, teamRule: true },
+  { id: "team-matchday", criterion: "team_best_matchday", name: "Bestes Team je Spieltag", points: 1, locked: true, teamRule: true }
 ];
 const ruleTypeNames = {
   total_goals: "Richtige Gesamtzahl Tore",
@@ -33,10 +35,23 @@ const ruleTypeNames = {
   away_goals: "Richtige Tore Ausw\u00e4rtsteam",
   goal_difference: "Richtiger Torunterschied"
 };
+const teamBonusDefaults = [
+  { id: "team-match", criterion: "team_best_match", name: "Bestes Team je Spiel", points: 1, locked: true, teamRule: true },
+  { id: "team-matchday", criterion: "team_best_matchday", name: "Bestes Team je Spieltag", points: 1, locked: true, teamRule: true }
+];
+
+function ensureTeamBonusRules() {
+  teamBonusDefaults.forEach((defaultRule) => {
+    if (!scoringRules.some((rule) => rule.criterion === defaultRule.criterion)) {
+      scoringRules.push({ ...defaultRule });
+    }
+  });
+}
 
 const storageKey = "tippradar26-tips";
 let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
+let teamScoreSummary = {};
 const matchesList = document.querySelector("#matches-list");
 const toast = document.querySelector("#toast");
 
@@ -66,6 +81,7 @@ function normalizeOpenLigaMatch(apiMatch, index) {
     homeFlag: apiMatch.team1?.teamIconUrl ? `<img src="${apiMatch.team1.teamIconUrl}" alt="">` : fallback.homeFlag,
     awayFlag: apiMatch.team2?.teamIconUrl ? `<img src="${apiMatch.team2.teamIconUrl}" alt="">` : fallback.awayFlag,
     result: finalResult ? `${finalResult.pointsTeam1}:${finalResult.pointsTeam2}` : null,
+    matchday: apiMatch.group?.groupOrderID || apiMatch.group?.groupName || "1",
     openLigaId: apiMatch.matchID
   };
 }
@@ -87,10 +103,12 @@ async function loadOpenLigaMatches() {
     renderMatches();
     renderTipMatrix();
     if (window.TippRadarCloud?.league?.role === "organizer") {
-      matches.filter((match) => match.result).forEach((match) => {
+      await Promise.all(matches.filter((match) => match.result).map((match) => {
         const [home, away] = match.result.split(":").map(Number);
-        window.TippRadarCloud.scoreMatch(match.id, home, away).catch(() => {});
-      });
+        return window.TippRadarCloud.scoreMatch(match.id, match.matchday, home, away).catch(() => {});
+      }));
+      teamScoreSummary = await window.TippRadarCloud.loadTeamScores();
+      renderTeams();
     }
   } catch (error) {
     status.textContent = "Demo-Spielplan / OpenLigaDB nicht erreichbar";
@@ -228,11 +246,16 @@ function renderTeams() {
   }
   grid.innerHTML = teams.map((team) => {
     const weightedTotal = team.members.reduce((sum, member) => sum + member.weight, 0);
+    const score = teamScoreSummary[team.id] || { base: 0, matchBonus: 0, matchdayBonus: 0 };
+    const totalScore = score.base + score.matchBonus + score.matchdayBonus;
     return `
       <article class="team-card" data-team-id="${team.id}">
         <div class="team-card-head">
           <div><span class="team-rank" style="background:${team.color}">${team.name.slice(0, 2).toUpperCase()}</span><span><strong>${escapeHtml(team.name)}</strong><small>${team.members.length} Spieler</small></span></div>
-          <div class="team-actions"><button data-action="toggle-player-form">+ Spieler</button><button class="danger-button" data-action="delete-team" title="Team l&ouml;schen">&times;</button></div>
+          <div class="team-head-right">
+            <span class="team-live-points"><strong>${totalScore.toFixed(1)}</strong> Teampunkte</span>
+            <div class="team-actions"><button data-action="toggle-player-form">+ Spieler</button><button class="danger-button" data-action="delete-team" title="Team l&ouml;schen">&times;</button></div>
+          </div>
         </div>
         <div class="player-form" hidden>
           <input data-field="player-name" type="text" maxlength="24" placeholder="Name des Spielers">
@@ -256,6 +279,11 @@ function renderTeams() {
           <span style="background:${team.color}"></span>
           Summe der Faktoren: <strong>${weightedTotal.toFixed(2)}</strong> / ${team.members.length}
           <em>${team.members.length ? "automatisch ausgeglichen" : "noch ohne Gewichtung"}</em>
+        </div>
+        <div class="team-bonus-strip">
+          <span>Basis <strong>${score.base.toFixed(1)}</strong></span>
+          <span>Beste Spiele <strong>+${score.matchBonus.toFixed(1)}</strong></span>
+          <span>Beste Spieltage <strong>+${score.matchdayBonus.toFixed(1)}</strong></span>
         </div>
       </article>`;
   }).join("");
@@ -320,12 +348,12 @@ function renderRules() {
   if (!container) return;
   container.innerHTML = scoringRules.map((rule) => `
     <label data-rule-id="${rule.id}">
-      <span><i class="rule-dot ${rule.id}"></i>${escapeHtml(rule.name)}</span>
+      <span><i class="rule-dot ${rule.teamRule ? "team-bonus" : rule.id}"></i>${escapeHtml(rule.name)}${rule.teamRule ? "<small class=\"team-rule-label\">TEAM-BONUS</small>" : ""}</span>
       <input type="number" min="0" max="10" value="${rule.points}" data-action="rule-points">
       <small>Punkte</small>
       ${rule.locked ? "" : `<button class="rule-delete" data-action="delete-rule" aria-label="Kategorie l&ouml;schen">&times;</button>`}
     </label>`).join("");
-  const total = scoringRules.reduce((sum, rule) => sum + Number(rule.points), 0);
+  const total = scoringRules.filter((rule) => !rule.teamRule).reduce((sum, rule) => sum + Number(rule.points), 0);
   document.querySelector("#rule-count").textContent = `${scoringRules.length} Kategorien`;
   document.querySelector("#rule-total").textContent = `${total} Punkte`;
 }
@@ -581,14 +609,18 @@ function updateAccountUi() {
 async function syncFromCloud() {
   const cloud = window.TippRadarCloud;
   if (!cloud?.league) return;
-  const [state, cloudTips] = await Promise.all([cloud.loadState(), cloud.loadPredictions()]);
+  const [state, cloudTips, cloudTeamScores] = await Promise.all([
+    cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores()
+  ]);
   if (state) {
     teams = Array.isArray(state.teams) ? state.teams : teams;
     scoringRules = Array.isArray(state.scoring_rules) && state.scoring_rules.length ? state.scoring_rules : scoringRules;
+    ensureTeamBonusRules();
     localStorage.setItem(teamStorageKey, JSON.stringify(teams));
     localStorage.setItem(ruleStorageKey, JSON.stringify(scoringRules));
   }
   savedTips = cloudTips;
+  teamScoreSummary = cloudTeamScores;
   localStorage.setItem(storageKey, JSON.stringify(savedTips));
   renderTeams();
   renderRules();
@@ -602,6 +634,7 @@ async function initializeCloud() {
     await window.TippRadarCloud?.init();
     updateAccountUi();
     await syncFromCloud();
+    if (window.TippRadarCloud?.league?.role === "organizer") await loadOpenLigaMatches();
   } catch (error) {
     showToast("Cloud nicht erreichbar", "Die App arbeitet vorerst lokal weiter.");
   }
@@ -675,6 +708,7 @@ function updateCountdown() {
 }
 
 renderMatches();
+ensureTeamBonusRules();
 renderRankChart();
 renderTipMatrix();
 renderTeams();

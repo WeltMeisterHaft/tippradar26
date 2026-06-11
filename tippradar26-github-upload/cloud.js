@@ -108,6 +108,26 @@
     ]));
   }
 
+  async function loadTeamScores() {
+    if (!league) return {};
+    const [{ data: matchScores, error: matchError }, { data: dayScores, error: dayError }] = await Promise.all([
+      client.from("team_match_scores").select("team_id, match_bonus").eq("league_id", league.id),
+      client.from("team_matchday_bonuses").select("team_id, weighted_points, bonus_points").eq("league_id", league.id)
+    ]);
+    if (matchError || dayError) return {};
+    const summary = {};
+    (dayScores || []).forEach((row) => {
+      summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0 };
+      summary[row.team_id].base += Number(row.weighted_points || 0);
+      summary[row.team_id].matchdayBonus += Number(row.bonus_points || 0);
+    });
+    (matchScores || []).forEach((row) => {
+      summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0 };
+      summary[row.team_id].matchBonus += Number(row.match_bonus || 0);
+    });
+    return summary;
+  }
+
   async function savePredictions(tips) {
     if (!league || !session) return;
     const rows = Object.entries(tips).map(([matchId, tip]) => ({
@@ -125,10 +145,11 @@
     if (error) throw error;
   }
 
-  async function scoreMatch(matchId, homeScore, awayScore) {
+  async function scoreMatch(matchId, matchday, homeScore, awayScore) {
     if (!league || league.role !== "organizer") return;
     const { error } = await client.rpc("score_finished_match", {
       target_match: String(matchId),
+      target_matchday: String(matchday),
       actual_home: homeScore,
       actual_away: awayScore
     });
@@ -137,7 +158,7 @@
 
   window.TippRadarCloud = {
     init, sendMagicLink, signOut, createLeague, joinLeague,
-    loadState, saveState, loadPredictions, savePredictions, scoreMatch,
+    loadState, saveState, loadPredictions, savePredictions, loadTeamScores, scoreMatch,
     get configured() { return configured; },
     get session() { return session; },
     get league() { return league; }

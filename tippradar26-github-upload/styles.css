@@ -562,6 +562,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .rule-number { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 15px; color: var(--ink); background: var(--lime); font: 800 26px "Manrope"; }
 .team-rule-banner p { margin: 4px 0 0; color: #91a198; font-size: 12px; }
 .rule-formula { padding: 8px 10px; border: 1px solid rgba(201,255,56,.25); border-radius: 7px; color: var(--lime); font-size: 9px; letter-spacing: .1em; }
+.team-link-note { margin: -8px 4px 18px; color: var(--muted); font-size: 10px; }
 .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .team-card { border: 1px solid var(--line); border-radius: 18px; background: var(--paper); overflow: hidden; }
 .team-card-head { min-height: 78px; padding: 16px 19px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
@@ -604,6 +605,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .rule-inputs small { color: var(--muted); font-size: 9px; }
 .rule-dot { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 3px; }
 .rule-dot.exact { background: var(--lime); }.rule-dot.difference { background: #8eb7f0; }.rule-dot.tendency { background: var(--violet); }.rule-dot.wrong { background: #d9ddda; }
+.rule-dot.team-bonus { background: #ff9d54; box-shadow: 0 0 0 3px rgba(255,157,84,.14); }
+.team-rule-label { margin-left: 7px; padding: 3px 5px; border-radius: 4px; color: #9a4d13 !important; background: #fff0e4; font-size: 7px !important; letter-spacing: .08em; }
 .rule-preview { padding: 18px; border-radius: 14px; color: white; background: var(--ink); }
 .rule-preview > div { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.09); font-size: 11px; }
 .rule-preview strong { color: var(--lime); font: 800 15px "Manrope"; }
@@ -619,6 +622,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .team-creator-form { grid-template-columns: 1fr 100px auto; }
 .team-creator-form input[type="color"] { width: 100%; padding: 5px; cursor: pointer; }
 .team-actions { display: flex; gap: 7px; }
+.team-head-right { display: flex; align-items: center; gap: 13px; }
+.team-live-points { color: var(--muted); font-size: 8px; text-align: right; text-transform: uppercase; letter-spacing: .07em; }
+.team-live-points strong { display: block; color: var(--ink); font: 800 18px "Manrope"; letter-spacing: 0; }
 .team-actions button { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: white; font-size: 10px; font-weight: 700; cursor: pointer; }
 .team-actions .danger-button, .member-delete { color: #a24d40; }
 .player-form { display: grid; grid-template-columns: 1fr 1.2fr auto; gap: 8px; padding: 12px 16px; background: #f3f5ef; border-bottom: 1px solid var(--line); }
@@ -634,6 +640,10 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .empty-members { padding: 25px 18px; color: var(--muted); text-align: center; font-size: 11px; }
 .team-card-foot { display: flex; align-items: center; }
 .team-card-foot em { margin-left: auto; color: #72816c; font-style: normal; }
+.team-bonus-strip { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: #172c22; }
+.team-bonus-strip span { padding: 9px 12px; color: #91a198; border-right: 1px solid rgba(255,255,255,.08); font-size: 8px; text-align: center; text-transform: uppercase; letter-spacing: .05em; }
+.team-bonus-strip span:last-child { border-right: 0; }
+.team-bonus-strip strong { display: block; margin-top: 2px; color: var(--lime); font: 800 12px "Manrope"; }
 .rules-heading p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
 .rule-inputs label { position: relative; grid-template-columns: 1fr 65px 45px 28px; }
 .rule-delete { width: 26px; height: 26px; border: 0; border-radius: 50%; color: #a24d40; background: #fff0ed; cursor: pointer; }
@@ -719,6 +729,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
   .rules-footer { align-items: stretch; flex-direction: column; gap: 15px; }
   .team-members > div { padding-left: 10px; padding-right: 10px; }
   .team-members > .member-admin { grid-template-columns: 20px 32px 1fr 28px; }
+  .team-head-right { align-items: end; flex-direction: column; gap: 6px; }
   .member-admin .weight-control { grid-column: 2 / 4; }
   .member-admin .member-delete { grid-column: 4; grid-row: 1; }
   .add-rule-row { grid-template-columns: 1fr 58px; }
