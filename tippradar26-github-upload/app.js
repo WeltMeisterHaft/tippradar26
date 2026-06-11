@@ -79,6 +79,9 @@ let teamScoreSummary = {};
 let leaguePredictions = {};
 let fantasyPicks = [];
 let profileStandings = [];
+let tournamentTeams = [...new Set(demoMatches.flatMap((match) => [match.home, match.away]))]
+  .sort((a, b) => a.localeCompare(b, "de"));
+const squadCache = {};
 const matchesList = document.querySelector("#matches-list");
 const toast = document.querySelector("#toast");
 
@@ -119,6 +122,8 @@ async function loadOpenLigaMatches() {
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
       .map(normalizeOpenLigaMatch);
     if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
+    tournamentTeams = [...new Set(normalized.flatMap((match) => [match.home, match.away]))]
+      .sort((a, b) => a.localeCompare(b, "de"));
     if (window.TippRadarCloud?.league?.role === "organizer") {
       await window.TippRadarCloud.syncSchedule(normalized);
     }
@@ -129,7 +134,9 @@ async function loadOpenLigaMatches() {
     status.parentElement.classList.add("connected");
     renderMatches();
     renderTipMatrix();
+    renderFantasyPicks();
     if (window.TippRadarCloud?.league?.role === "organizer") {
+      await syncApiFootballEvents(normalized);
       await Promise.all(matches.filter((match) => match.result).map((match) => {
         const [home, away] = match.result.split(":").map(Number);
         return window.TippRadarCloud.scoreMatch(match.id, match.matchday, home, away).catch(() => {});
@@ -309,24 +316,112 @@ function renderFantasyPicks() {
   container.innerHTML = Array.from({ length: 5 }, (_, index) => {
     const slot = index + 1;
     const pick = picksBySlot[slot] || {};
+    const teamOptions = [...new Set([pick.national_team, ...tournamentTeams].filter(Boolean))];
+    const cached = squadCache[normalizedTeamName(pick.national_team || "")];
+    const players = cached?.players || [];
+    const playerOptions = pick.player_name && !players.some((player) => String(player.id) === String(pick.player_id))
+      ? [{ id: pick.player_id, name: pick.player_name }, ...players] : players;
     return `<label class="fantasy-pick">
       <span>${slot}</span>
-      <input data-fantasy-player="${slot}" type="text" maxlength="50" value="${escapeHtml(pick.player_name || "")}" placeholder="Spielername">
-      <input data-fantasy-team="${slot}" type="text" maxlength="40" value="${escapeHtml(pick.national_team || "")}" placeholder="Nationalmannschaft">
+      <select data-fantasy-team="${slot}">
+        <option value="">Nationalmannschaft w&auml;hlen</option>
+        ${teamOptions.map((team) => `<option value="${escapeHtml(team)}" ${team === pick.national_team ? "selected" : ""}>${escapeHtml(team)}</option>`).join("")}
+      </select>
+      <select data-fantasy-player="${slot}" ${pick.national_team ? "" : "disabled"}>
+        <option value="">${pick.national_team ? (cached ? "Spieler w\u00e4hlen" : "Kader wird geladen") : "Zuerst Mannschaft w\u00e4hlen"}</option>
+        ${playerOptions.map((player) => `<option value="${player.id}" ${String(player.id) === String(pick.player_id) ? "selected" : ""}>${escapeHtml(player.name)}</option>`).join("")}
+      </select>
     </label>`;
   }).join("");
   document.querySelector("#fantasy-counter").textContent = `${fantasyPicks.length} / 5 gew\u00e4hlt`;
+  fantasyPicks.filter((pick) => pick.national_team && !squadCache[normalizedTeamName(pick.national_team)])
+    .forEach((pick) => loadSquadForSlot(pick.slot, pick.national_team, pick.player_id));
 }
 
 function collectFantasyPicks() {
   return Array.from({ length: 5 }, (_, index) => {
     const slot = index + 1;
+    const playerSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
+    const teamSelect = document.querySelector(`[data-fantasy-team="${slot}"]`);
+    const selectedPlayer = playerSelect.options[playerSelect.selectedIndex];
+    const cached = squadCache[normalizedTeamName(teamSelect.value)];
     return {
       slot,
-      player_name: document.querySelector(`[data-fantasy-player="${slot}"]`).value.trim(),
-      national_team: document.querySelector(`[data-fantasy-team="${slot}"]`).value.trim()
+      player_id: playerSelect.value ? Number(playerSelect.value) : null,
+      player_name: playerSelect.value ? (selectedPlayer?.textContent?.trim() || "") : "",
+      api_team_id: cached?.teamId || null,
+      national_team: teamSelect.value
     };
   }).filter((pick) => pick.player_name || pick.national_team);
+}
+
+async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
+  if (!teamName || !window.TippRadarCloud?.session) return;
+  const cacheKey = normalizedTeamName(teamName);
+  const playerSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
+  if (playerSelect) {
+    playerSelect.disabled = true;
+    playerSelect.innerHTML = '<option value="">Kader wird geladen</option>';
+  }
+  try {
+    squadCache[cacheKey] ||= await window.TippRadarCloud.loadTeamSquad(teamName);
+    const players = squadCache[cacheKey].players || [];
+    const currentSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
+    if (!currentSelect) return;
+    currentSelect.disabled = false;
+    currentSelect.innerHTML = `<option value="">Spieler w&auml;hlen</option>${players.map((player) =>
+      `<option value="${player.id}" ${String(player.id) === String(selectedPlayerId) ? "selected" : ""}>${escapeHtml(player.name)}</option>`
+    ).join("")}`;
+  } catch (error) {
+    if (playerSelect) playerSelect.innerHTML = '<option value="">Kader nicht erreichbar</option>';
+    showToast("Kader nicht geladen", `${teamName}: ${error.message}`);
+  }
+}
+
+function dateKey(value) {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date(value));
+}
+
+async function syncApiFootballEvents(schedule) {
+  const cloud = window.TippRadarCloud;
+  if (!cloud?.league || cloud.league.role !== "organizer") return;
+  const now = Date.now();
+  const finishedRecent = schedule.filter((match) => match.result
+    && now - new Date(match.kickoff).getTime() < 47 * 60 * 60 * 1000);
+  const dates = [...new Set(finishedRecent.map((match) => dateKey(match.kickoff)))];
+  for (const date of dates) {
+    try {
+      const apiDay = await cloud.loadFootballDay(date);
+      for (const match of finishedRecent.filter((item) => dateKey(item.kickoff) === date)) {
+        const fixture = apiDay.fixtures.find((item) =>
+          Math.abs(new Date(item.date).getTime() - new Date(match.kickoff).getTime()) < 90 * 60 * 1000
+        );
+        if (!fixture) continue;
+        const data = await cloud.loadFootballEvents(fixture.id);
+        const goals = new Map();
+        data.events.filter((event) =>
+          event.type === "Goal"
+          && !/own goal|missed penalty|shootout/i.test(`${event.detail || ""} ${event.comments || ""}`)
+          && event.player
+        ).forEach((event) => {
+          const key = String(event.playerId || `${event.player}-${event.team}`);
+          const existing = goals.get(key) || {
+            player_id: event.playerId || null,
+            player_name: event.player,
+            national_team: event.team,
+            goals: 0
+          };
+          existing.goals += 1;
+          goals.set(key, existing);
+        });
+        await cloud.replaceGoalEvents(match.id, [...goals.values()]);
+      }
+    } catch (error) {
+      showToast("Torsch\u00fctzen-Sync pausiert", error.message);
+    }
+  }
 }
 
 function renderScorerMatches() {
@@ -642,6 +737,11 @@ document.querySelector("#save-fantasy-picks").addEventListener("click", async ()
   } catch (error) {
     showToast("Top 5 nicht gespeichert", error.message);
   }
+});
+document.querySelector("#fantasy-picks").addEventListener("change", (event) => {
+  const slot = event.target.dataset.fantasyTeam;
+  if (!slot) return;
+  loadSquadForSlot(Number(slot), event.target.value);
 });
 
 function openTeamCreator() {

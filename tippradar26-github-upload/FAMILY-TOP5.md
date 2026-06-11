@@ -19,7 +19,7 @@ Der Organisator ordnet Haupt- und Kinderprofile wie bisher ueber den identischen
 - Die Auswahl wird mit dem ersten Turnierspiel geschlossen.
 - Eigentore und Elfmeterschiessen werden nicht erfasst. Regulare Elfmetertore koennen als Tor eingetragen werden.
 
-OpenLigaDB liefert keine verlaessliche Torschuetzenliste. Deshalb traegt der Organisator nach einem Spiel nur relevante Torschuetzen unter **Teams & Regeln** ein. Das Mannschaftsergebnis kommt weiterhin automatisch von OpenLigaDB.
+Die Kader und Torschuetzen kommen automatisch von API-Football. OpenLigaDB bleibt die Quelle fuer Spielplan und Endergebnisse. Die manuelle Torschuetzen-Eingabe unter **Teams & Regeln** dient nur als Notfallkorrektur.
 
 ## Supabase
 

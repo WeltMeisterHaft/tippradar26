@@ -223,7 +223,7 @@
   async function loadFantasyPicks() {
     if (!league || !activeProfile) return [];
     const { data, error } = await client.from("fantasy_picks")
-      .select("slot, player_name, national_team")
+      .select("slot, player_id, player_name, api_team_id, national_team")
       .eq("league_id", league.id).eq("profile_id", activeProfile.id).order("slot");
     if (error) throw error;
     return data || [];
@@ -243,6 +243,37 @@
       scorer_team: nationalTeam, scorer_goals: goals
     });
     if (error) throw error;
+  }
+
+  async function replaceGoalEvents(matchId, events) {
+    const { error } = await client.rpc("replace_api_goal_events", {
+      target_match: String(matchId),
+      goal_events: events
+    });
+    if (error) throw error;
+  }
+
+  async function footballRequest(action, parameters = {}) {
+    if (!session) throw new Error("Bitte zuerst anmelden.");
+    const query = new URLSearchParams({ action, ...parameters });
+    const response = await fetch(`/api/football?${query}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    });
+    const body = await response.json();
+    if (!response.ok || !body.ok) throw new Error(body.error || "Fu\u00dfballdaten nicht erreichbar.");
+    return body;
+  }
+
+  function loadFootballDay(date) {
+    return footballRequest("day", { date });
+  }
+
+  function loadTeamSquad(team) {
+    return footballRequest("team-squad", { team });
+  }
+
+  function loadFootballEvents(fixture) {
+    return footballRequest("events", { fixture });
   }
 
   async function loadStandings() {
@@ -293,7 +324,8 @@
     init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
     loadProfiles, selectProfile, addFamilyProfile,
     loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions, saveBotPredictions,
-    loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, loadStandings,
+    loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadStandings,
+    loadFootballDay, loadTeamSquad, loadFootballEvents,
     loadTeamScores, syncSchedule, scoreMatch,
     get configured() { return configured; },
     get session() { return session; },
