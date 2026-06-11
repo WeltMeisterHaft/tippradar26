@@ -563,7 +563,13 @@ function renderTeams() {
               <span class="member-name">
                 <strong>${escapeHtml(member.name)}</strong>
                 <span class="member-meta">
-                  <small class="role-badge ${participantRole(member)}">${participantRoleNames[participantRole(member)]}</small>
+                  ${member.bot
+                    ? `<small class="role-badge bot">Auto</small>`
+                    : `<select class="member-role-select" data-action="member-role" aria-label="Rolle von ${escapeHtml(member.name)}">
+                        <option value="lead" ${participantRole(member) === "lead" ? "selected" : ""}>Team-Lead</option>
+                        <option value="adult" ${participantRole(member) === "adult" ? "selected" : ""}>Erwachsen</option>
+                        <option value="child" ${participantRole(member) === "child" ? "selected" : ""}>Kind</option>
+                      </select>`}
                   <small class="team-badge" style="--team-color:${team.color}">${escapeHtml(team.name)}</small>
                 </span>
                 ${member.bot ? `<small>${botStrategyNames[member.strategy === "cooper" ? "stat" : (member.strategy || "dog")]}</small>` : ""}
@@ -899,6 +905,38 @@ document.querySelector("#team-grid").addEventListener("change", (event) => {
     const role = form.querySelector('[data-field="player-role"]');
     strategy.hidden = event.target.value !== "bot";
     role.hidden = event.target.value === "bot";
+    return;
+  }
+  if (event.target.dataset.action === "member-role") {
+    const card = event.target.closest("[data-team-id]");
+    const row = event.target.closest("[data-member-id]");
+    const team = teams.find((item) => item.id === card.dataset.teamId);
+    const member = team.members.find((item) => item.id === row.dataset.memberId);
+    const previousRole = participantRole(member);
+    member.role = event.target.value;
+    persistTeams();
+
+    const profile = profileForName(member.name);
+    if (profile && window.TippRadarCloud?.updateProfileType) {
+      window.TippRadarCloud.updateProfileType(profile.id, member.role)
+        .then(() => {
+          renderTeams();
+          renderTipMatrix();
+          renderRanking();
+          showToast("Rolle ge\u00e4ndert", `${member.name} ist jetzt ${participantRoleNames[member.role]}.`);
+        })
+        .catch((error) => {
+          member.role = previousRole;
+          persistTeams();
+          renderTeams();
+          showToast("Rolle nicht ge\u00e4ndert", error.message);
+        });
+    } else {
+      renderTeams();
+      renderTipMatrix();
+      renderRanking();
+      showToast("Rolle ge\u00e4ndert", `${member.name} ist jetzt ${participantRoleNames[member.role]}.`);
+    }
     return;
   }
   if (event.target.dataset.action !== "weight") return;

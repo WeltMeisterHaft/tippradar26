@@ -133,6 +133,16 @@
     return data;
   }
 
+  async function updateProfileType(profileId, profileType) {
+    if (!league) throw new Error("Keine Tipprunde gefunden.");
+    const { error } = await client.rpc("set_participant_profile_type", {
+      target_profile: profileId,
+      target_type: profileType
+    });
+    if (error) throw error;
+    await loadProfiles();
+  }
+
   async function saveState(teams, scoringRules) {
     if (!league || league.role !== "organizer") return;
     const { error } = await client.from("league_state").upsert({
@@ -325,7 +335,7 @@
 
   window.TippRadarCloud = {
     init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
-    loadProfiles, selectProfile, addFamilyProfile,
+    loadProfiles, selectProfile, addFamilyProfile, updateProfileType,
     loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions, saveBotPredictions,
     loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadStandings,
     loadFootballDay, loadTeamSquad, loadFootballEvents,

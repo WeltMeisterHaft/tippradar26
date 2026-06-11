@@ -609,6 +609,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .member-name { display: grid; font-size: 11px; }
 .member-name small { color: #658500; font-size: 7px; letter-spacing: .08em; }
 .member-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.member-role-select { max-width: 100px; height: 21px; padding: 0 18px 0 6px; border: 1px solid #d7ddd6; border-radius: 10px; color: var(--ink); background: white; font-size: 8px; font-weight: 800; cursor: pointer; }
 .member-score { font: 800 13px "Manrope"; text-align: right; }
 .count-state { padding: 4px 5px; border-radius: 5px; color: #527000; background: var(--lime-soft); font-size: 8px; font-weight: 700; text-align: center; text-transform: uppercase; }
 .discarded .count-state { color: var(--muted); background: #e5e8e2; }
