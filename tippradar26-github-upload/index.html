@@ -231,6 +231,7 @@
           </div>
           <div class="creator-form team-creator-form">
             <label><span>Teamname</span><input id="team-name" type="text" maxlength="24" placeholder="z. B. Team Nordkurve"></label>
+            <label><span>Teamart</span><select id="team-category"><option value="family">Family</option><option value="single">Single</option></select></label>
             <label><span>Teamfarbe</span><input id="team-color" type="color" value="#c9ff38"></label>
             <button class="primary-button" id="create-team">Team anlegen</button>
           </div>
@@ -315,8 +316,9 @@
             <label><span>Kontoart</span><select id="current-account-type"><option value="single">Single</option><option value="family">Family</option></select></label>
             <label><span>Wer tippt gerade?</span><select id="active-profile"></select></label>
             <div id="family-profile-creator" hidden>
-              <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Kindes">
-              <button id="add-family-profile">+ Kinderprofil</button>
+              <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Familienmitglieds">
+              <select id="family-profile-type"><option value="child">Kind</option><option value="adult">Erwachsene/r</option></select>
+              <button id="add-family-profile">+ Familienprofil</button>
             </div>
           </div>
           <button class="secondary-button full-button" id="sign-out">Abmelden</button>

@@ -2,8 +2,8 @@
 
 ## Vor der Einladung
 
-1. Teams anlegen.
-2. Erwachsene und Kinder mit ihrem spaeteren Anzeigenamen als Spieler eintragen.
+1. Teams mit der Teamart `Family` anlegen und unterschiedliche Teamfarben vergeben.
+2. Team-Leads, Erwachsene und Kinder mit ihrem spaeteren Anzeigenamen und der richtigen Rolle eintragen.
 3. Gewichtungen kontrollieren.
 4. Punkte- und Teamregeln speichern.
 5. Einladungscode aus dem Kontofenster notieren.

@@ -3,11 +3,13 @@
 ## Kontoarten
 
 - **Single:** Eine E-Mail und ein Tipp-Profil.
-- **Family:** Eine E-Mail fuer das Hauptprofil und zusaetzliche Kinderprofile.
+- **Family:** Eine E-Mail fuer das Hauptprofil und zusaetzliche Erwachsenen- oder Kinderprofile.
 - Bestehende Konten koennen im Kontofenster von **Single** auf **Family** umgestellt werden.
 - Im Kontofenster wird vor dem Tippen ueber **Wer tippt gerade?** das aktive Profil gewaehlt.
 - Jedes Profil besitzt eigene Tipps, Punkte und eine eigene Top-5-Auswahl.
-- Kinder benoetigen keine E-Mail-Adresse.
+- Weitere Erwachsene und Kinder benoetigen keine eigene E-Mail-Adresse.
+- Das Hauptprofil eines Family-Kontos wird als **Team-Lead** gekennzeichnet.
+- Teamname, Teamfarbe und Rolle sind im Tippvergleich und in der Rangliste sichtbar.
 
 Der Organisator ordnet Haupt- und Kinderprofile wie bisher ueber den identischen Anzeigenamen einem Wertungsteam zu.
 
@@ -23,9 +25,10 @@ Die Kader und Torschuetzen kommen automatisch von API-Football. OpenLigaDB bleib
 
 ## Supabase
 
-Die beiden SQL-Dateien im Supabase-Paket in dieser Reihenfolge ausfuehren:
+Die SQL-Dateien im Supabase-Paket in dieser Reihenfolge ausfuehren:
 
 1. `01-migration-bot-strategies.sql`
 2. `02-migration-family-top5.sql`
+3. `03-migration-family-roles.sql`
 
 Beide Migrationen sind fuer eine bereits laufende TippRadar-Datenbank vorgesehen.

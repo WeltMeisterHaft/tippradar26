@@ -69,8 +69,11 @@
     return profile;
   }
 
-  async function addFamilyProfile(displayName) {
-    const { error } = await client.rpc("add_family_profile", { child_name: displayName });
+  async function addFamilyProfile(displayName, profileType = "child") {
+    const { error } = await client.rpc("add_family_profile", {
+      profile_name: displayName,
+      target_profile_type: profileType
+    });
     if (error) throw error;
     await loadProfiles();
     activeProfile = profiles.filter((profile) => profile.account_user_id === session.user.id).at(-1);

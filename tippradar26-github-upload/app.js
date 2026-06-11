@@ -294,14 +294,34 @@ function allBotPredictions() {
   ));
 }
 
+const participantRoleNames = {
+  lead: "Team-Lead",
+  adult: "Erwachsen",
+  child: "Kind",
+  bot: "Auto"
+};
+
+function profileForName(name) {
+  return window.TippRadarCloud?.profiles?.find((profile) =>
+    profile.display_name.trim().toLowerCase() === name.trim().toLowerCase()
+  );
+}
+
+function participantRole(member) {
+  if (member.bot) return "bot";
+  return profileForName(member.name)?.profile_type || member.role || "adult";
+}
+
 function currentParticipants() {
   return teams.flatMap((team) => team.members.map((member) => ({
     id: member.id,
     name: member.name,
     initials: member.initials,
-    color: member.bot ? "cooper-avatar" : "blue",
+    color: member.bot ? "cooper-avatar" : "team-avatar",
     cooper: member.bot,
-    team: team.name
+    role: participantRole(member),
+    team: team.name,
+    teamColor: team.color
   })));
 }
 
@@ -463,9 +483,12 @@ function renderTipMatrix() {
         ${participants.map((participant) => `
           <th class="${participant.cooper ? "cooper-column" : ""} ${participant.you ? "you-column" : ""}">
             <span class="matrix-person">
-              <i class="mini-avatar ${participant.color}">${participant.initials}</i>
+              <i class="mini-avatar ${participant.color}" style="--team-color:${participant.teamColor}">${participant.initials}</i>
               <strong>${participant.name}</strong>
-              ${participant.cooper ? "<small>Auto-Tipp</small>" : ""}
+              <span class="participant-meta">
+                <small class="role-badge ${participant.role}">${participantRoleNames[participant.role]}</small>
+                <small class="team-badge" style="--team-color:${participant.teamColor}">${escapeHtml(participant.team)}</small>
+              </span>
             </span>
           </th>`).join("")}
       </tr>
@@ -509,9 +532,9 @@ function renderTeams() {
     const score = teamScoreSummary[team.id] || { base: 0, matchBonus: 0, matchdayBonus: 0 };
     const totalScore = score.base + score.matchBonus + score.matchdayBonus;
     return `
-      <article class="team-card" data-team-id="${team.id}">
+      <article class="team-card" data-team-id="${team.id}" style="--team-color:${team.color}">
         <div class="team-card-head">
-          <div><span class="team-rank" style="background:${team.color}">${team.name.slice(0, 2).toUpperCase()}</span><span><strong>${escapeHtml(team.name)}</strong><small>${team.members.length} Spieler</small></span></div>
+          <div><span class="team-rank" style="background:${team.color}">${team.name.slice(0, 2).toUpperCase()}</span><span><strong>${escapeHtml(team.name)}</strong><small>${(team.category || "family").toUpperCase()} &middot; ${team.members.length} Spieler</small></span></div>
           <div class="team-head-right">
             <span class="team-live-points"><strong>${totalScore.toFixed(1)}</strong> Teampunkte</span>
             <div class="team-actions"><button data-action="toggle-player-form">+ Spieler</button><button class="danger-button" data-action="delete-team" title="Team l&ouml;schen">&times;</button></div>
@@ -520,6 +543,11 @@ function renderTeams() {
         <div class="player-form" hidden>
           <input data-field="player-name" type="text" maxlength="24" placeholder="Name des Spielers">
           <select data-field="player-type"><option value="human">Mensch</option><option value="bot">Automatischer Tipp-Spieler</option></select>
+          <select data-field="player-role">
+            <option value="lead">Team-Lead</option>
+            <option value="adult">Erwachsene/r</option>
+            <option value="child">Kind</option>
+          </select>
           <select data-field="bot-strategy" hidden>
             <option value="dog">DOG-TIP / Zufallsprinzip</option>
             <option value="rank">RANK-TIP / FIFA-Rangliste</option>
@@ -531,8 +559,15 @@ function renderTeams() {
           ${team.members.length ? team.members.map((member, index) => `
             <div class="member-admin" data-member-id="${member.id}">
               <span class="member-position">${index + 1}</span>
-              <span class="mini-avatar ${member.bot ? "cooper-avatar" : "blue"}">${member.initials}</span>
-              <span class="member-name"><strong>${escapeHtml(member.name)}</strong>${member.bot ? `<small>${botStrategyNames[member.strategy === "cooper" ? "stat" : (member.strategy || "dog")]}</small>` : "<small>SPIELER</small>"}</span>
+              <span class="mini-avatar ${member.bot ? "cooper-avatar" : "team-avatar"}" style="--team-color:${team.color}">${member.initials}</span>
+              <span class="member-name">
+                <strong>${escapeHtml(member.name)}</strong>
+                <span class="member-meta">
+                  <small class="role-badge ${participantRole(member)}">${participantRoleNames[participantRole(member)]}</small>
+                  <small class="team-badge" style="--team-color:${team.color}">${escapeHtml(team.name)}</small>
+                </span>
+                ${member.bot ? `<small>${botStrategyNames[member.strategy === "cooper" ? "stat" : (member.strategy || "dog")]}</small>` : ""}
+              </span>
               <label class="weight-control">
                 <span>Faktor <b>${member.weight.toFixed(2)}</b></span>
                 <input type="range" min="0.75" max="1.25" step="0.05" value="${member.weight}" data-action="weight">
@@ -653,7 +688,14 @@ function renderRanking() {
   body.innerHTML = participants.length ? participants.map((participant, index) => `
     <tr class="${participant.cooper ? "cooper-row" : ""}">
       <td><b class="rank-number">${index + 1}</b></td>
-      <td><span class="mini-avatar ${participant.color}">${participant.initials}</span><strong>${escapeHtml(participant.name)}</strong><small> ${escapeHtml(participant.team)}</small></td>
+      <td>
+        <span class="mini-avatar ${participant.color}" style="--team-color:${participant.teamColor}">${participant.initials}</span>
+        <strong>${escapeHtml(participant.name)}</strong>
+        <span class="participant-meta">
+          <small class="role-badge ${participant.role}">${participantRoleNames[participant.role]}</small>
+          <small class="team-badge" style="--team-color:${participant.teamColor}">${escapeHtml(participant.team)}</small>
+        </span>
+      </td>
       <td><span class="trend flat">${participant.points.fantasy ? `Top 5 +${participant.points.fantasy}` : "&ndash;"}</span></td><td>0</td><td><strong>${participant.points.total}</strong></td>
     </tr>`).join("") : `
     <tr><td colspan="5" class="ranking-empty">Noch keine Spieler angelegt. Die Rangliste f&uuml;llt sich mit eurer Runde.</td></tr>`;
@@ -778,7 +820,13 @@ document.querySelector("#create-team").addEventListener("click", () => {
     input.focus();
     return;
   }
-  teams.push({ id: makeId("team"), name, color: document.querySelector("#team-color").value, members: [] });
+  teams.push({
+    id: makeId("team"),
+    name,
+    category: document.querySelector("#team-category").value,
+    color: document.querySelector("#team-color").value,
+    members: []
+  });
   persistTeams();
   renderTeams();
   input.value = "";
@@ -811,7 +859,8 @@ document.querySelector("#team-grid").addEventListener("click", (event) => {
     }
     const bot = card.querySelector('[data-field="player-type"]').value === "bot";
     const strategy = bot ? card.querySelector('[data-field="bot-strategy"]').value : null;
-    team.members.push({ id: makeId("player"), name, initials: initialsFor(name), bot, strategy, weight: 1 });
+    const role = bot ? "bot" : card.querySelector('[data-field="player-role"]').value;
+    team.members.push({ id: makeId("player"), name, initials: initialsFor(name), bot, role, strategy, weight: 1 });
     persistTeams();
     renderTeams();
     renderTipMatrix();
@@ -845,8 +894,11 @@ document.querySelector("#team-grid").addEventListener("click", (event) => {
 
 document.querySelector("#team-grid").addEventListener("change", (event) => {
   if (event.target.dataset.field === "player-type") {
-    const strategy = event.target.closest(".player-form").querySelector('[data-field="bot-strategy"]');
+    const form = event.target.closest(".player-form");
+    const strategy = form.querySelector('[data-field="bot-strategy"]');
+    const role = form.querySelector('[data-field="player-role"]');
     strategy.hidden = event.target.value !== "bot";
+    role.hidden = event.target.value === "bot";
     return;
   }
   if (event.target.dataset.action !== "weight") return;
@@ -921,7 +973,13 @@ function updateAccountUi() {
     document.querySelector("#current-account-type").value = cloud.league.accountType;
     const profileSelect = document.querySelector("#active-profile");
     profileSelect.innerHTML = ownedProfiles.map((profile) =>
-      `<option value="${profile.id}" ${profile.id === cloud.activeProfile?.id ? "selected" : ""}>${escapeHtml(profile.display_name)}${profile.profile_type === "child" ? " / Kind" : ""}</option>`
+      {
+        const team = teams.find((item) => item.members.some((member) =>
+          member.name.trim().toLowerCase() === profile.display_name.trim().toLowerCase()
+        ));
+        const role = participantRoleNames[profile.profile_type] || "Erwachsen";
+        return `<option value="${profile.id}" ${profile.id === cloud.activeProfile?.id ? "selected" : ""}>${escapeHtml(profile.display_name)} / ${role}${team ? ` / ${escapeHtml(team.name)}` : " / noch ohne Team"}</option>`;
+      }
     ).join("");
     document.querySelector("#family-profile-creator").hidden = cloud.league.accountType !== "family";
     setAccountPanel("cloud-account");
@@ -1043,13 +1101,14 @@ document.querySelector("#current-account-type").addEventListener("change", async
 document.querySelector("#add-family-profile").addEventListener("click", async () => {
   const input = document.querySelector("#family-profile-name");
   const name = input.value.trim();
-  if (!name) return showToast("Name fehlt", "Bitte gib den Namen des Kindes ein.");
+  const profileType = document.querySelector("#family-profile-type").value;
+  if (!name) return showToast("Name fehlt", "Bitte gib den Namen des Familienmitglieds ein.");
   try {
-    await window.TippRadarCloud.addFamilyProfile(name);
+    await window.TippRadarCloud.addFamilyProfile(name, profileType);
     input.value = "";
     updateAccountUi();
     await syncFromCloud();
-    showToast("Kinderprofil angelegt", `${name} kann jetzt eigene Tipps abgeben.`);
+    showToast("Familienprofil angelegt", `${name} kann jetzt eigene Tipps abgeben.`);
   } catch (error) {
     showToast("Profil nicht angelegt", error.message);
   }
