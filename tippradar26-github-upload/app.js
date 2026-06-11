@@ -309,6 +309,20 @@ function fantasyStorageKey() {
   return `tippradar26-fantasy-${window.TippRadarCloud?.activeProfile?.id || "local"}`;
 }
 
+function positionLabel(position) {
+  return ({
+    Goalkeeper: "TOR",
+    Defender: "ABWEHR",
+    Midfielder: "MITTELFELD",
+    Attacker: "STURM"
+  })[position] || "FELD";
+}
+
+function playerOptionLabel(player) {
+  const number = player.number ? ` #${player.number}` : "";
+  return `${player.name} \u00b7 ${positionLabel(player.position)}${number}`;
+}
+
 function renderFantasyPicks() {
   const container = document.querySelector("#fantasy-picks");
   if (!container) return;
@@ -320,7 +334,7 @@ function renderFantasyPicks() {
     const cached = squadCache[normalizedTeamName(pick.national_team || "")];
     const players = cached?.players || [];
     const playerOptions = pick.player_name && !players.some((player) => String(player.id) === String(pick.player_id))
-      ? [{ id: pick.player_id, name: pick.player_name }, ...players] : players;
+      ? [{ id: pick.player_id, name: pick.player_name, position: pick.position }, ...players] : players;
     return `<label class="fantasy-pick">
       <span>${slot}</span>
       <select data-fantasy-team="${slot}">
@@ -329,7 +343,7 @@ function renderFantasyPicks() {
       </select>
       <select data-fantasy-player="${slot}" ${pick.national_team ? "" : "disabled"}>
         <option value="">${pick.national_team ? (cached ? "Spieler w\u00e4hlen" : "Kader wird geladen") : "Zuerst Mannschaft w\u00e4hlen"}</option>
-        ${playerOptions.map((player) => `<option value="${player.id}" ${String(player.id) === String(pick.player_id) ? "selected" : ""}>${escapeHtml(player.name)}</option>`).join("")}
+        ${playerOptions.map((player) => `<option value="${player.id}" ${String(player.id) === String(pick.player_id) ? "selected" : ""}>${escapeHtml(playerOptionLabel(player))}</option>`).join("")}
       </select>
     </label>`;
   }).join("");
@@ -348,7 +362,9 @@ function collectFantasyPicks() {
     return {
       slot,
       player_id: playerSelect.value ? Number(playerSelect.value) : null,
-      player_name: playerSelect.value ? (selectedPlayer?.textContent?.trim() || "") : "",
+      player_name: playerSelect.value
+        ? (cached?.players?.find((player) => String(player.id) === playerSelect.value)?.name || "")
+        : "",
       api_team_id: cached?.teamId || null,
       national_team: teamSelect.value
     };
@@ -370,7 +386,7 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
     if (!currentSelect) return;
     currentSelect.disabled = false;
     currentSelect.innerHTML = `<option value="">Spieler w&auml;hlen</option>${players.map((player) =>
-      `<option value="${player.id}" ${String(player.id) === String(selectedPlayerId) ? "selected" : ""}>${escapeHtml(player.name)}</option>`
+      `<option value="${player.id}" ${String(player.id) === String(selectedPlayerId) ? "selected" : ""}>${escapeHtml(playerOptionLabel(player))}</option>`
     ).join("")}`;
   } catch (error) {
     if (playerSelect) playerSelect.innerHTML = '<option value="">Kader nicht erreichbar</option>';
