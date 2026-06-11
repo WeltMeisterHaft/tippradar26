@@ -20,11 +20,10 @@ Nach dem Deployment diese Adresse oeffnen:
 
 `https://tippradar26.vercel.app/api/football?action=probe&token=DEIN-PRUEFWORT`
 
-Erwartet wird JSON mit `"ok":true`. Wichtig sind:
+Erwartet wird JSON mit `"ok":true`. Der Test fragt bewusst nur das aktuelle Datum ab, da der Free-Tarif `season=2026` blockiert. Wichtig sind:
 
-- `leagueResults`
 - `fixtureResults`
-- `leagueErrors`
+- `worldCupResults`
 - `fixtureErrors`
 
 Der Test verbraucht hoechstens drei API-Abfragen. Der Schluessel wird weder an den Browser noch an GitHub ausgeliefert.

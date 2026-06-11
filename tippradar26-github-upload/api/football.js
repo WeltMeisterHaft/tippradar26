@@ -47,25 +47,30 @@ module.exports = async function handler(request, response) {
   try {
     if (action === "probe") {
       const today = berlinDate();
-      const [status, league, fixtures] = await Promise.all([
+      const [status, fixtures] = await Promise.all([
         apiRequest("/status", key),
-        apiRequest("/leagues?id=1&season=2026", key),
-        apiRequest(`/fixtures?league=1&season=2026&date=${today}`, key)
+        apiRequest(`/fixtures?date=${today}`, key)
       ]);
+      const worldCupFixtures = (fixtures.response || []).filter((item) =>
+        item.league?.id === 1 || /world cup/i.test(item.league?.name || "")
+      );
       send(response, 200, {
         ok: true,
         date: today,
         requests: status.response?.requests || null,
-        leagueErrors: league.errors || {},
-        leagueResults: league.results || 0,
         fixtureErrors: fixtures.errors || {},
         fixtureResults: fixtures.results || 0,
-        fixtures: (fixtures.response || []).map((item) => ({
+        worldCupResults: worldCupFixtures.length,
+        fixtures: worldCupFixtures.map((item) => ({
           id: item.fixture?.id,
           date: item.fixture?.date,
           status: item.fixture?.status?.short,
+          leagueId: item.league?.id,
+          league: item.league?.name,
           home: item.teams?.home?.name,
-          away: item.teams?.away?.name
+          away: item.teams?.away?.name,
+          homeTeamId: item.teams?.home?.id,
+          awayTeamId: item.teams?.away?.id
         }))
       });
       return;
