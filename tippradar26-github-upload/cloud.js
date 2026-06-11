@@ -6,6 +6,7 @@
   let league = null;
   let profiles = [];
   let activeProfile = null;
+  let organizerName = "";
 
   async function init() {
     if (!client) return { configured: false };
@@ -35,7 +36,16 @@
       role: data.role,
       accountType: data.account_type || "single"
     } : null;
-    if (league) await loadProfiles();
+    if (league) {
+      const { data: organizer } = await client.from("league_members")
+        .select("display_name")
+        .eq("league_id", league.id)
+        .eq("role", "organizer")
+        .limit(1)
+        .maybeSingle();
+      organizerName = organizer?.display_name || "";
+      await loadProfiles();
+    }
     return league;
   }
 
@@ -49,12 +59,15 @@
   async function loadProfiles() {
     if (!league || !session) return [];
     const { data, error } = await client.from("participant_profiles")
-      .select("id, display_name, profile_type, is_primary, account_user_id")
+      .select("id, display_name, profile_type, auto_strategy, is_primary, account_user_id")
       .eq("league_id", league.id)
       .order("created_at");
     if (error) throw error;
     profiles = data || [];
-    const owned = profiles.filter((profile) => profile.account_user_id === session.user.id);
+    const owned = profiles.filter((profile) =>
+      profile.account_user_id === session.user.id
+      && (profile.is_primary || profile.profile_type === "child")
+    );
     const remembered = localStorage.getItem(`tippradar26-active-profile-${league.id}`);
     activeProfile = owned.find((profile) => profile.id === remembered)
       || owned.find((profile) => profile.is_primary) || owned[0] || null;
@@ -62,21 +75,27 @@
   }
 
   function selectProfile(profileId) {
-    const profile = profiles.find((item) => item.id === profileId && item.account_user_id === session?.user?.id);
+    const profile = profiles.find((item) =>
+      item.id === profileId
+      && item.account_user_id === session?.user?.id
+      && (item.is_primary || item.profile_type === "child")
+    );
     if (!profile) return null;
     activeProfile = profile;
     localStorage.setItem(`tippradar26-active-profile-${league.id}`, profile.id);
     return profile;
   }
 
-  async function addFamilyProfile(displayName, profileType = "child") {
+  async function addFamilyProfile(displayName) {
     const { error } = await client.rpc("add_family_profile", {
       profile_name: displayName,
-      target_profile_type: profileType
+      target_profile_type: "child"
     });
     if (error) throw error;
     await loadProfiles();
-    activeProfile = profiles.filter((profile) => profile.account_user_id === session.user.id).at(-1);
+    activeProfile = profiles.filter((profile) =>
+      profile.account_user_id === session.user.id && profile.profile_type === "child"
+    ).at(-1);
     localStorage.setItem(`tippradar26-active-profile-${league.id}`, activeProfile.id);
     return activeProfile;
   }
@@ -97,6 +116,7 @@
     league = null;
     profiles = [];
     activeProfile = null;
+    organizerName = "";
   }
 
   async function createLeague(name, inviteCode, displayName) {
@@ -138,6 +158,26 @@
     const { error } = await client.rpc("set_participant_profile_type", {
       target_profile: profileId,
       target_type: profileType
+    });
+    if (error) throw error;
+    await loadProfiles();
+  }
+
+  async function renameProfile(profileId, displayName) {
+    if (!league) throw new Error("Keine Tipprunde gefunden.");
+    const { error } = await client.rpc("rename_participant_profile", {
+      target_profile: profileId,
+      new_display_name: displayName
+    });
+    if (error) throw error;
+    await loadMembership();
+  }
+
+  async function setProfileAutoStrategy(profileId, strategy) {
+    if (!league) throw new Error("Keine Tipprunde gefunden.");
+    const { error } = await client.rpc("set_profile_auto_strategy", {
+      target_profile: profileId,
+      target_strategy: strategy
     });
     if (error) throw error;
     await loadProfiles();
@@ -229,6 +269,21 @@
     if (!rows.length) return;
     const { error } = await client.rpc("save_profile_predictions", {
       target_profile: activeProfile.id, tips: rows
+    });
+    if (error) throw error;
+  }
+
+  async function savePredictionsForProfile(profileId, tips) {
+    if (!league || !profileId) return;
+    const rows = Object.entries(tips).map(([matchId, tip]) => ({
+      match_id: matchId,
+      home_score: tip.home,
+      away_score: tip.away
+    }));
+    if (!rows.length) return;
+    const { error } = await client.rpc("save_profile_predictions", {
+      target_profile: profileId,
+      tips: rows
     });
     if (error) throw error;
   }
@@ -335,8 +390,8 @@
 
   window.TippRadarCloud = {
     init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
-    loadProfiles, selectProfile, addFamilyProfile, updateProfileType,
-    loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions, saveBotPredictions,
+    loadProfiles, selectProfile, addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
+    loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
     loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadStandings,
     loadFootballDay, loadTeamSquad, loadFootballEvents,
     loadTeamScores, syncSchedule, scoreMatch,
@@ -344,6 +399,7 @@
     get session() { return session; },
     get league() { return league; },
     get profiles() { return profiles; },
-    get activeProfile() { return activeProfile; }
+    get activeProfile() { return activeProfile; },
+    get organizerName() { return organizerName; }
   };
 })();
