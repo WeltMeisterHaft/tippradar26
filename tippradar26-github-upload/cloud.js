@@ -108,6 +108,37 @@
     ]));
   }
 
+  async function loadLeaguePredictions() {
+    if (!league) return {};
+    const [{ data: members, error: memberError }, { data: tips, error: tipError }] = await Promise.all([
+      client.from("league_members").select("user_id, display_name").eq("league_id", league.id),
+      client.from("predictions").select("user_id, match_id, home_score, away_score").eq("league_id", league.id)
+    ]);
+    if (memberError || tipError) return {};
+    const names = Object.fromEntries((members || []).map((member) => [member.user_id, member.display_name]));
+    const result = {};
+    (tips || []).forEach((tip) => {
+      const name = names[tip.user_id];
+      if (!name) return;
+      result[name] ||= {};
+      result[name][tip.match_id] = `${tip.home_score}:${tip.away_score}`;
+    });
+    return result;
+  }
+
+  async function syncSchedule(matches) {
+    if (!league || league.role !== "organizer") return;
+    const payload = matches.map((match) => ({
+      match_id: String(match.id),
+      kickoff: match.kickoff,
+      matchday: String(match.matchday),
+      home_team: match.home,
+      away_team: match.away
+    }));
+    const { error } = await client.rpc("sync_match_schedule", { schedule: payload });
+    if (error) throw error;
+  }
+
   async function loadTeamScores() {
     if (!league) return {};
     const [{ data: matchScores, error: matchError }, { data: dayScores, error: dayError }] = await Promise.all([
@@ -158,7 +189,8 @@
 
   window.TippRadarCloud = {
     init, sendMagicLink, signOut, createLeague, joinLeague,
-    loadState, saveState, loadPredictions, savePredictions, loadTeamScores, scoreMatch,
+    loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions,
+    loadTeamScores, syncSchedule, scoreMatch,
     get configured() { return configured; },
     get session() { return session; },
     get league() { return league; }

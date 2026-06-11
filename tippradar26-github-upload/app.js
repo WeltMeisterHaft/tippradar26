@@ -1,16 +1,19 @@
 const demoMatches = [
   {
     id: "mex-za", time: "Do / 21:00", group: "Gruppe A / Mexico City",
+    kickoff: "2026-06-11T21:00:00+02:00", matchday: "1",
     home: "Mexiko", away: "S\u00fcdafrika", homeFlag: "&#x1F1F2;&#x1F1FD;", awayFlag: "&#x1F1FF;&#x1F1E6;",
     crowd: "2:0", crowdPercent: 68, odds: [1.44, 4.20, 7.50], cooper: "2:0", confidence: 69
   },
   {
     id: "kor-cze", time: "Fr / 03:00", group: "Gruppe A / Guadalajara",
+    kickoff: "2026-06-12T03:00:00+02:00", matchday: "1",
     home: "S\u00fcdkorea", away: "Tschechien", homeFlag: "&#x1F1F0;&#x1F1F7;", awayFlag: "&#x1F1E8;&#x1F1FF;",
     crowd: "1:1", crowdPercent: 42, odds: [2.70, 3.10, 2.65], cooper: "1:1", confidence: 36
   },
   {
     id: "can-bih", time: "Fr / 21:00", group: "Gruppe B / Toronto",
+    kickoff: "2026-06-12T21:00:00+02:00", matchday: "1",
     home: "Kanada", away: "Bosnien-Herzegowina", homeFlag: "&#x1F1E8;&#x1F1E6;", awayFlag: "&#x1F1E7;&#x1F1E6;",
     crowd: "2:1", crowdPercent: 57, odds: [1.92, 3.55, 3.85], cooper: "2:1", confidence: 51
   }
@@ -52,6 +55,7 @@ const storageKey = "tippradar26-tips";
 let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
 let teamScoreSummary = {};
+let leaguePredictions = {};
 const matchesList = document.querySelector("#matches-list");
 const toast = document.querySelector("#toast");
 
@@ -74,6 +78,7 @@ function normalizeOpenLigaMatch(apiMatch, index) {
   return {
     ...fallback,
     id: String(apiMatch.matchID),
+    kickoff: apiMatch.matchDateTimeUTC || apiMatch.matchDateTime,
     time: formatMatchTime(apiMatch.matchDateTime),
     group: `${apiMatch.group?.groupName || "WM 2026"} / ${apiMatch.location?.locationCity || "Austragungsort offen"}`,
     home: apiMatch.team1?.teamName || fallback.home,
@@ -92,12 +97,17 @@ async function loadOpenLigaMatches() {
     const response = await fetch("https://api.openligadb.de/getmatchdata/wm26/2026");
     if (!response.ok) throw new Error(`OpenLigaDB ${response.status}`);
     const data = await response.json();
-    const relevant = data
+    const normalized = data
       .filter((match) => match.team1 && match.team2)
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
-      .slice(0, 3);
-    if (!relevant.length) throw new Error("Keine WM-Spiele gefunden");
-    matches = relevant.map(normalizeOpenLigaMatch);
+      .map(normalizeOpenLigaMatch);
+    if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
+    if (window.TippRadarCloud?.league?.role === "organizer") {
+      await window.TippRadarCloud.syncSchedule(normalized);
+    }
+    const recentBoundary = Date.now() - (6 * 60 * 60 * 1000);
+    const relevant = normalized.filter((match) => new Date(match.kickoff).getTime() >= recentBoundary);
+    matches = (relevant.length ? relevant : normalized.slice(-12)).slice(0, 12);
     status.textContent = "Spielplan live von OpenLigaDB";
     status.parentElement.classList.add("connected");
     renderMatches();
@@ -120,17 +130,18 @@ function renderMatches() {
   matchesList.innerHTML = matches.map((match) => {
     const tip = savedTips[match.id] || {};
     const probabilities = fairProbabilities(match.odds);
+    const open = isMatchOpen(match);
     return `
-      <article class="match-card" data-match="${match.id}">
+      <article class="match-card ${open ? "" : "match-locked"}" data-match="${match.id}" data-kickoff="${match.kickoff}">
         <div class="match-meta"><strong>${match.time}</strong><span>${match.group}</span></div>
         <div class="match-teams">
           <div class="match-team"><span class="small-flag">${match.homeFlag}</span>${match.home}</div>
           <div class="match-team"><span class="small-flag">${match.awayFlag}</span>${match.away}</div>
         </div>
         <div class="score-inputs" aria-label="Ergebnis fuer ${match.home} gegen ${match.away}">
-          <input class="score-input" data-side="home" type="number" min="0" max="20" inputmode="numeric" value="${tip.home ?? ""}" aria-label="Tore ${match.home}">
+          <input class="score-input" data-side="home" type="number" min="0" max="20" inputmode="numeric" value="${tip.home ?? ""}" aria-label="Tore ${match.home}" ${open ? "" : "disabled"}>
           <span>:</span>
-          <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}">
+          <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}" ${open ? "" : "disabled"}>
         </div>
         <div class="match-insights">
           <div class="community-note">Community: <strong>${match.crowd}</strong> / ${match.crowdPercent}% sehen ${match.home} vorn</div>
@@ -145,15 +156,21 @@ function renderMatches() {
           <span><small>X</small><b>${match.odds[1].toFixed(2)}</b><i>${probabilities[1]}%</i></span>
           <span><small>2</small><b>${match.odds[2].toFixed(2)}</b><i>${probabilities[2]}%</i></span>
         </div>
+        ${open ? "" : '<div class="locked-label">Tipp geschlossen</div>'}
       </article>`;
   }).join("");
   document.querySelectorAll(".score-input").forEach((input) => input.addEventListener("input", updateProgress));
   updateProgress();
 }
 
+function isMatchOpen(match) {
+  return !match.kickoff || Date.now() < new Date(match.kickoff).getTime();
+}
+
 function collectTips() {
   const tips = {};
   document.querySelectorAll(".match-card").forEach((card) => {
+    if (card.classList.contains("match-locked")) return;
     const home = card.querySelector('[data-side="home"]').value;
     const away = card.querySelector('[data-side="away"]').value;
     if (home !== "" && away !== "") tips[card.dataset.match] = { home: Number(home), away: Number(away) };
@@ -174,7 +191,7 @@ function updateProgress() {
 
 function tipForParticipant(participant, match, index) {
   if (participant.cooper) return match.cooper;
-  return "\u2013";
+  return leaguePredictions[participant.name]?.[match.id] || "\u2013";
 }
 
 function currentParticipants() {
@@ -443,13 +460,16 @@ document.querySelectorAll("[data-range]").forEach((button) => button.addEventLis
   renderRankChart(button.dataset.range);
 }));
 
-document.querySelector("#save-tips").addEventListener("click", () => {
+document.querySelector("#save-tips").addEventListener("click", async () => {
   savedTips = collectTips();
   localStorage.setItem(storageKey, JSON.stringify(savedTips));
   if (window.TippRadarCloud?.league) {
-    window.TippRadarCloud.savePredictions(savedTips).catch(() => {
-      showToast("Lokal gespeichert", "Die Cloud-Synchronisierung ist gerade nicht erreichbar.");
-    });
+    try {
+      await window.TippRadarCloud.savePredictions(savedTips);
+    } catch (error) {
+      showToast("Nicht zentral gespeichert", error.message.includes("policy") ? "Mindestens ein Tipp ist bereits geschlossen." : error.message);
+      return;
+    }
   }
   updateProgress();
   showToast("Tipps gespeichert", "Viel Erfolg!");
@@ -609,8 +629,8 @@ function updateAccountUi() {
 async function syncFromCloud() {
   const cloud = window.TippRadarCloud;
   if (!cloud?.league) return;
-  const [state, cloudTips, cloudTeamScores] = await Promise.all([
-    cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores()
+  const [state, cloudTips, cloudTeamScores, allTips] = await Promise.all([
+    cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores(), cloud.loadLeaguePredictions()
   ]);
   if (state) {
     teams = Array.isArray(state.teams) ? state.teams : teams;
@@ -621,6 +641,13 @@ async function syncFromCloud() {
   }
   savedTips = cloudTips;
   teamScoreSummary = cloudTeamScores;
+  leaguePredictions = allTips;
+  if (cloud.league?.displayName) {
+    leaguePredictions[cloud.league.displayName] ||= {};
+    Object.entries(cloudTips).forEach(([matchId, tip]) => {
+      leaguePredictions[cloud.league.displayName][matchId] = `${tip.home}:${tip.away}`;
+    });
+  }
   localStorage.setItem(storageKey, JSON.stringify(savedTips));
   renderTeams();
   renderRules();
