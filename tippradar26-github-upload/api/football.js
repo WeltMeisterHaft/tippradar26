@@ -98,6 +98,53 @@ module.exports = async function handler(request, response) {
       return;
     }
 
+    if (action === "fixture-check") {
+      const fixture = String(request.query.fixture || "");
+      const homeTeam = String(request.query.homeTeam || "");
+      const awayTeam = String(request.query.awayTeam || "");
+      if (![fixture, homeTeam, awayTeam].every((value) => /^\d+$/.test(value))) {
+        send(response, 400, {
+          ok: false,
+          error: "Numerische fixture-, homeTeam- und awayTeam-IDs werden benoetigt."
+        });
+        return;
+      }
+      const [events, homeSquad, awaySquad] = await Promise.all([
+        apiRequest(`/fixtures/events?fixture=${fixture}`, key),
+        apiRequest(`/players/squads?team=${homeTeam}`, key),
+        apiRequest(`/players/squads?team=${awayTeam}`, key)
+      ]);
+      send(response, 200, {
+        ok: true,
+        eventErrors: events.errors || {},
+        eventResults: events.results || 0,
+        events: (events.response || []).map((event) => ({
+          minute: event.time?.elapsed,
+          team: event.team?.name,
+          player: event.player?.name,
+          type: event.type,
+          detail: event.detail
+        })),
+        homeSquadErrors: homeSquad.errors || {},
+        homeSquadResults: homeSquad.results || 0,
+        homeSquad: (homeSquad.response || []).flatMap((team) =>
+          (team.players || []).map((player) => ({
+            id: player.id, name: player.name, position: player.position,
+            number: player.number, team: team.team?.name
+          }))
+        ),
+        awaySquadErrors: awaySquad.errors || {},
+        awaySquadResults: awaySquad.results || 0,
+        awaySquad: (awaySquad.response || []).flatMap((team) =>
+          (team.players || []).map((player) => ({
+            id: player.id, name: player.name, position: player.position,
+            number: player.number, team: team.team?.name
+          }))
+        )
+      });
+      return;
+    }
+
     if (action === "squad") {
       const team = String(request.query.team || "");
       if (!/^\d+$/.test(team)) {

@@ -27,3 +27,11 @@ Erwartet wird JSON mit `"ok":true`. Der Test fragt bewusst nur das aktuelle Datu
 - `fixtureErrors`
 
 Der Test verbraucht hoechstens drei API-Abfragen. Der Schluessel wird weder an den Browser noch an GitHub ausgeliefert.
+
+## Kader und Ereignisse testen
+
+Mit den IDs aus dem ersten Test:
+
+`https://tippradar26.vercel.app/api/football?action=fixture-check&fixture=1489369&homeTeam=16&awayTeam=1531&token=DEIN-PRUEFWORT`
+
+Dieser Test verbraucht drei weitere Abfragen. Vor dem Anpfiff darf `eventResults` noch `0` sein. Entscheidend ist, ob `homeSquad` und `awaySquad` Spieler enthalten und keine Plan-Fehler gemeldet werden.
