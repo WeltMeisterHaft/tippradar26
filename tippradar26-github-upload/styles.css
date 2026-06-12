@@ -555,6 +555,15 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .fantasy-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; }
 .fantasy-heading h2, .scorer-admin h2 { margin: 5px 0 0; font: 800 24px "Manrope"; letter-spacing: -.03em; }
 .fantasy-card > p, .scorer-admin p { color: var(--muted); font-size: 12px; }
+.fantasy-card > .fantasy-source {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: #536059;
+  background: #f1f5e8;
+  line-height: 1.5;
+}
+.fantasy-source a { color: #4f7000; font-weight: 800; }
 .fantasy-counter { padding: 7px 10px; border-radius: 20px; color: #4e6900; background: var(--lime-soft); font-size: 10px; font-weight: 800; }
 .fantasy-picks { display: grid; gap: 8px; margin: 18px 0; }
 .fantasy-pick { display: grid; grid-template-columns: 28px 1fr 1fr; gap: 8px; align-items: center; }

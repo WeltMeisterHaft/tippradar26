@@ -69,6 +69,8 @@ function ensureTeamBonusRules() {
 }
 
 const storageKey = "tippradar26-tips";
+const squadStorageKey = "tippradar26-squad-cache-v1";
+const internationalStatsStorageKey = "tippradar26-international-stats-v1";
 let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
 let teamScoreSummary = {};
@@ -77,10 +79,25 @@ let fantasyPicks = [];
 let profileStandings = [];
 let scoringStart = null;
 let pointDetails = null;
+let scorerTotals = {};
+let internationalStats = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(internationalStatsStorageKey) || "[]");
+  } catch {
+    return [];
+  }
+})();
+let internationalStatsIndex = {};
 let tournamentSchedule = [...demoMatches];
 let tournamentTeams = [...new Set(demoMatches.flatMap((match) => [match.home, match.away]))]
   .sort((a, b) => a.localeCompare(b, "de"));
-const squadCache = {};
+const squadCache = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(squadStorageKey) || "{}");
+  } catch {
+    return {};
+  }
+})();
 const squadRequests = {};
 const matchesList = document.querySelector("#matches-list");
 const toast = document.querySelector("#toast");
@@ -349,6 +366,115 @@ function normalizedTeamName(name) {
   return name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+function normalizedPlayerName(name) {
+  return normalizedTeamName(name)
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[^a-z0-9\s'-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function canonicalNationalTeam(name) {
+  const normalized = normalizedTeamName(name);
+  return ({
+    "mexiko": "mexico",
+    "sudafrika": "south africa",
+    "sudkorea": "south korea",
+    "tschechien": "czech republic",
+    "deutschland": "germany",
+    "niederlande": "netherlands",
+    "elfenbeinkuste": "ivory coast",
+    "vereinigte staaten": "united states",
+    "usa": "united states",
+    "dr kongo": "dr congo",
+    "kap verde": "cape verde",
+    "saudi-arabien": "saudi arabia",
+    "bosnien-herzegowina": "bosnia and herzegovina"
+  })[normalized] || normalized;
+}
+
+function playerShortKey(name) {
+  const parts = normalizedPlayerName(name).split(" ").filter(Boolean);
+  if (parts.length < 2) return "";
+  return `${parts[0][0]}:${parts.at(-1)}`;
+}
+
+function rebuildInternationalStatsIndex() {
+  const candidates = {};
+  internationalStats.forEach((stat) => {
+    const team = canonicalNationalTeam(stat.team || "");
+    const exact = normalizedPlayerName(stat.name);
+    const short = playerShortKey(stat.name);
+    [`${team}|name:${exact}`, `name:${exact}`, `${team}|short:${short}`, `short:${short}`]
+      .filter((key) => !key.endsWith(":"))
+      .forEach((key) => {
+        if (!(key in candidates)) candidates[key] = stat;
+        else if (candidates[key]?.name !== stat.name || candidates[key]?.team !== stat.team) candidates[key] = null;
+      });
+  });
+  internationalStatsIndex = candidates;
+}
+
+function internationalStatForPlayer(player) {
+  const team = canonicalNationalTeam(player.team || "");
+  const exact = normalizedPlayerName(player.name);
+  const short = playerShortKey(player.name);
+  return internationalStatsIndex[`${team}|name:${exact}`]
+    || internationalStatsIndex[`name:${exact}`]
+    || internationalStatsIndex[`${team}|short:${short}`]
+    || internationalStatsIndex[`short:${short}`]
+    || null;
+}
+
+async function loadInternationalStats() {
+  rebuildInternationalStatsIndex();
+  if (internationalStats.length) {
+    renderFantasyPicks();
+    return;
+  }
+  try {
+    const url = "https://en.wikipedia.org/w/api.php?action=parse&page=2026_FIFA_World_Cup_squads&prop=text&format=json&formatversion=2&origin=*";
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const documentCopy = new DOMParser().parseFromString(payload?.parse?.text || "", "text/html");
+    const records = [];
+    let currentTeam = "";
+    documentCopy.body.querySelectorAll("h3, table.wikitable").forEach((element) => {
+      if (element.tagName === "H3") {
+        currentTeam = element.querySelector(".mw-headline")?.textContent.trim()
+          || element.textContent.replace(/\[edit\]/gi, "").trim();
+        return;
+      }
+      const headers = [...element.querySelectorAll("tr:first-child th")]
+        .map((cell) => normalizedPlayerName(cell.textContent));
+      const playerIndex = headers.findIndex((header) => header === "player");
+      const capsIndex = headers.findIndex((header) => header === "caps");
+      const goalsIndex = headers.findIndex((header) => header === "goals");
+      if (!currentTeam || playerIndex < 0 || capsIndex < 0 || goalsIndex < 0) return;
+      [...element.querySelectorAll("tr")].slice(1).forEach((row) => {
+        const cells = [...row.querySelectorAll(":scope > th, :scope > td")];
+        const name = cells[playerIndex]?.textContent
+          .replace(/\[[^\]]*\]/g, "")
+          .replace(/\s*\(captain\)\s*/gi, " ")
+          .trim();
+        const caps = Number.parseInt(cells[capsIndex]?.textContent, 10);
+        const goals = Number.parseInt(cells[goalsIndex]?.textContent, 10);
+        if (name && Number.isFinite(caps) && Number.isFinite(goals)) {
+          records.push({ name, team: currentTeam, caps, goals });
+        }
+      });
+    });
+    if (records.length < 500) throw new Error("Spielerstatistik unvollständig");
+    internationalStats = records;
+    localStorage.setItem(internationalStatsStorageKey, JSON.stringify(records));
+    rebuildInternationalStatsIndex();
+    renderFantasyPicks();
+  } catch (error) {
+    console.warn("Länderspielstatistik konnte nicht aktualisiert werden:", error);
+  }
+}
+
 function rankFor(teamName) {
   const normalized = normalizedTeamName(teamName);
   if (fifaRank[normalized]) return fifaRank[normalized];
@@ -503,7 +629,13 @@ function positionLabel(position) {
 
 function playerOptionLabel(player) {
   const number = player.number ? ` #${player.number}` : "";
-  return `${player.name} \u00b7 ${positionLabel(player.position)}${number}`;
+  const scorerKey = player.id ? `id:${player.id}` : `name:${normalizedTeamName(player.name)}`;
+  const worldCupGoals = Number(scorerTotals[scorerKey] || 0);
+  const international = internationalStatForPlayer(player);
+  const internationalLabel = international
+    ? ` \u00b7 ${international.goals} Tore / ${international.caps} LS \u00b7 ${(international.caps ? (international.goals / international.caps) * 10 : 0).toFixed(1).replace(".", ",")} je 10 LS`
+    : "";
+  return `${player.name} \u00b7 ${positionLabel(player.position)}${number}${internationalLabel}${worldCupGoals ? ` \u00b7 WM: ${worldCupGoals}` : ""}`;
 }
 
 function renderFantasyPicks() {
@@ -566,6 +698,8 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
     if (!squadCache[cacheKey]) {
       squadRequests[cacheKey] ||= window.TippRadarCloud.loadTeamSquad(teamName);
       squadCache[cacheKey] = await squadRequests[cacheKey];
+      squadCache[cacheKey].cachedAt = new Date().toISOString();
+      localStorage.setItem(squadStorageKey, JSON.stringify(squadCache));
     }
     const players = squadCache[cacheKey].players || [];
     const currentSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
@@ -577,6 +711,16 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
   } catch (error) {
     delete squadRequests[cacheKey];
     const currentSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
+    if (squadCache[cacheKey]?.players?.length) {
+      if (currentSelect) {
+        currentSelect.disabled = false;
+        currentSelect.innerHTML = `<option value="">Spieler w&auml;hlen / letzter Stand</option>${squadCache[cacheKey].players.map((player) =>
+          `<option value="${player.id}" ${String(player.id) === String(selectedPlayerId) ? "selected" : ""}>${escapeHtml(playerOptionLabel(player))}</option>`
+        ).join("")}`;
+      }
+      showToast("Letzten Kaderstand verwendet", `${teamName}: gespeicherte Version vom ${new Intl.DateTimeFormat("de-DE").format(new Date(squadCache[cacheKey].cachedAt || Date.now()))}.`);
+      return;
+    }
     if (currentSelect) currentSelect.innerHTML = '<option value="">Kader momentan nicht erreichbar</option>';
     showToast("Kader momentan nicht erreichbar", `${teamName}: ${error.message}`);
   }
@@ -1488,16 +1632,18 @@ async function syncFromCloud() {
   ]);
   const optionalResults = await Promise.allSettled([
     cloud.loadTeamScores(), cloud.loadLeaguePredictions(), cloud.loadFantasyPicks(),
-    cloud.loadStandings(), cloud.loadPointDetails()
+    cloud.loadStandings(), cloud.loadPointDetails(), cloud.loadScorerTotals()
   ]);
   const [
-    cloudTeamScoresResult, allTipsResult, cloudFantasyResult, standingsResult, detailsResult
+    cloudTeamScoresResult, allTipsResult, cloudFantasyResult, standingsResult, detailsResult,
+    scorerTotalsResult
   ] = optionalResults;
   const cloudTeamScores = cloudTeamScoresResult.status === "fulfilled" ? cloudTeamScoresResult.value : {};
   const allTips = allTipsResult.status === "fulfilled" ? allTipsResult.value : {};
   const cloudFantasy = cloudFantasyResult.status === "fulfilled" ? cloudFantasyResult.value : [];
   const standings = standingsResult.status === "fulfilled" ? standingsResult.value : [];
   const details = detailsResult.status === "fulfilled" ? detailsResult.value : null;
+  const loadedScorerTotals = scorerTotalsResult.status === "fulfilled" ? scorerTotalsResult.value : {};
   const optionalFailures = optionalResults.filter((result) => result.status === "rejected");
   if (state) {
     const cleanedState = deduplicateBots(Array.isArray(state.teams) ? state.teams : teams);
@@ -1518,6 +1664,7 @@ async function syncFromCloud() {
   fantasyPicks = cloudFantasy;
   profileStandings = standings;
   pointDetails = details;
+  scorerTotals = loadedScorerTotals;
   if (cloud.activeProfile?.display_name) {
     leaguePredictions[cloud.activeProfile.display_name] ||= {};
     Object.entries(cloudTips).forEach(([matchId, tip]) => {
@@ -1743,6 +1890,7 @@ renderRanking();
 renderPointDetails();
 fantasyPicks = JSON.parse(localStorage.getItem(fantasyStorageKey()) || "[]");
 renderFantasyPicks();
+loadInternationalStats();
 renderScorerMatches();
 updateCountdown();
 loadOpenLigaMatches();

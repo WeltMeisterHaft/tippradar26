@@ -342,6 +342,21 @@
     if (error) throw error;
   }
 
+  async function loadScorerTotals() {
+    if (!league) return {};
+    const { data, error } = await client.from("player_match_events")
+      .select("player_id, player_name, goals")
+      .eq("league_id", league.id);
+    if (error) throw error;
+    return (data || []).reduce((totals, row) => {
+      const key = row.player_id
+        ? `id:${row.player_id}`
+        : `name:${String(row.player_name || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()}`;
+      totals[key] = Number(totals[key] || 0) + Number(row.goals || 0);
+      return totals;
+    }, {});
+  }
+
   async function footballRequest(action, parameters = {}) {
     if (!session) throw new Error("Bitte zuerst anmelden.");
     const query = new URLSearchParams({ action, ...parameters });
@@ -487,7 +502,7 @@
     init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
     loadProfiles, selectProfile, addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
     loadState, saveState, setScoringStart, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
-    loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadStandings,
+    loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadScorerTotals, loadStandings,
     loadFootballDay, loadTeamSquad, loadFootballEvents,
     loadTeamScores, loadPointDetails, syncSchedule, scoreMatch,
     get configured() { return configured; },
