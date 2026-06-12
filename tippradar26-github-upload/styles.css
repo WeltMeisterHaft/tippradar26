@@ -431,6 +431,21 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .ledger-detail-table span:first-child { text-align: left; }
 .ledger-detail-table strong { color: #587500; }
 .ledger-detail-head { color: var(--muted); background: #f5f7f2; font-weight: 800; text-transform: uppercase; }
+.participant-score-detail { border-top: 1px solid #edf0ea; }
+.participant-score-detail:first-of-type { border-top: 0; }
+.participant-score-detail > summary { display: grid; grid-template-columns: minmax(100px, 1fr) repeat(4, minmax(45px, .45fr)); align-items: center; min-height: 28px; cursor: pointer; list-style: none; }
+.participant-score-detail > summary::-webkit-details-marker { display: none; }
+.participant-score-detail > summary:hover { background: #fafbf8; }
+.participant-score-detail > summary span, .participant-score-detail > summary strong { padding: 6px 7px; text-align: right; font-size: 9px; }
+.participant-score-detail > summary span:first-child { display: flex; align-items: center; gap: 7px; text-align: left; }
+.participant-score-detail > summary span:first-child i { width: 6px; height: 6px; flex: 0 0 auto; border-right: 1.5px solid #77837c; border-bottom: 1.5px solid #77837c; transform: rotate(-45deg); transition: transform .18s; }
+.participant-score-detail[open] > summary span:first-child i { transform: rotate(45deg) translate(-1px,-1px); }
+.participant-score-detail > summary strong { color: #587500; }
+.score-category-list { display: grid; gap: 5px; padding: 8px 9px 10px 25px; border-top: 1px dashed #dfe4dd; background: #f9fbf6; }
+.score-category-list > span { display: grid; grid-template-columns: 7px 1fr auto; align-items: center; gap: 7px; padding: 0; color: #596b61; text-align: left; font-size: 9px; }
+.score-category-list > span i { width: 5px; height: 5px; border-radius: 50%; background: var(--lime); }
+.score-category-list > span strong { padding: 0; color: #587500; font-size: 9px; }
+.score-category-list .score-result-note { display: block; padding-bottom: 3px; color: var(--ink); font-weight: 800; }
 .ledger-day-bonus { display: flex; gap: 13px; align-items: center; flex-wrap: wrap; margin: 9px 14px 2px 28px; padding: 9px 11px; border: 1px solid #dbe8b8; border-radius: 8px; color: #596b61; background: var(--lime-soft); font-size: 9px; }
 .ledger-day-bonus strong { color: var(--ink); }
 .ledger-day-bonus b { color: #587500; }

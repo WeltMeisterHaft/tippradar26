@@ -920,8 +920,11 @@ function renderPointDetails() {
 
   const profileNames = Object.fromEntries(details.profiles.map((profile) => [profile.id, profile.display_name]));
   const fantasyByKey = Object.fromEntries(details.fantasy.map((row) => [
-    `${row.profile_id}:${row.match_id}`,
-    Number(row.goal_points || 0) + Number(row.win_points || 0)
+    `${row.profile_id}:${row.match_id}`, {
+      goals: Number(row.goal_points || 0),
+      wins: Number(row.win_points || 0),
+      total: Number(row.goal_points || 0) + Number(row.win_points || 0)
+    }
   ]));
   const teamNames = Object.fromEntries(teams.map((team) => [team.id, team.name]));
   const evaluatedMatchIds = new Set([
@@ -939,17 +942,51 @@ function renderPointDetails() {
     return;
   }
 
+  function tipCategoryBreakdown(tip, result, counted) {
+    if (!counted || !result) return [];
+    const [actualHome, actualAway] = result.split(":").map(Number);
+    const tipHome = Number(tip.home_score);
+    const tipAway = Number(tip.away_score);
+    const baseRules = scoringRules.filter((rule) =>
+      ["exact", "difference", "tendency", "wrong"].includes(rule.id)
+    );
+    const baseMatches = baseRules.map((rule) => {
+      let matched = false;
+      if (rule.id === "exact") matched = tipHome === actualHome && tipAway === actualAway;
+      if (rule.id === "difference") matched = tipHome - tipAway === actualHome - actualAway;
+      if (rule.id === "tendency") matched = Math.sign(tipHome - tipAway) === Math.sign(actualHome - actualAway);
+      if (rule.id === "wrong") matched = true;
+      return { name: rule.name, points: matched ? Number(rule.points || 0) : 0 };
+    }).filter((item) => item.points > 0);
+    const bestBase = baseMatches.sort((a, b) => b.points - a.points)[0];
+    const extras = scoringRules
+      .filter((rule) => !rule.teamRule && !["exact", "difference", "tendency", "wrong"].includes(rule.id))
+      .map((rule) => {
+        let matched = false;
+        if (rule.criterion === "goal_difference") matched = tipHome - tipAway === actualHome - actualAway;
+        if (rule.criterion === "total_goals") matched = tipHome + tipAway === actualHome + actualAway;
+        if (rule.criterion === "home_goals") matched = tipHome === actualHome;
+        if (rule.criterion === "away_goals") matched = tipAway === actualAway;
+        return { name: rule.name, points: matched ? Number(rule.points || 0) : 0 };
+      }).filter((item) => item.points > 0);
+    return [...(bestBase ? [bestBase] : []), ...extras];
+  }
+
   function matchBreakdown(match) {
     const counted = isMatchCounted(match);
     const profileRows = details.profileTips
       .filter((tip) => String(tip.match_id) === String(match.match_id))
       .map((tip) => {
         const tipPoints = counted ? Number(tip.points || 0) : 0;
-        const top5 = counted ? Number(fantasyByKey[`${tip.profile_id}:${tip.match_id}`] || 0) : 0;
+        const fantasy = counted
+          ? (fantasyByKey[`${tip.profile_id}:${tip.match_id}`] || { goals: 0, wins: 0, total: 0 })
+          : { goals: 0, wins: 0, total: 0 };
         return {
           name: profileNames[tip.profile_id] || "Unbekannt",
           tip: `${tip.home_score}:${tip.away_score}`,
-          tipPoints, top5, total: tipPoints + top5
+          tipPoints, top5: fantasy.total, total: tipPoints + fantasy.total,
+          categories: tipCategoryBreakdown(tip, match.result, counted),
+          fantasy
         };
       });
     const botRows = details.bots
@@ -957,7 +994,9 @@ function renderPointDetails() {
       .map((tip) => ({
         name: `${tip.bot_name} (Auto)`, tip: `${tip.home_score}:${tip.away_score}`,
         tipPoints: counted ? Number(tip.points || 0) : 0, top5: 0,
-        total: counted ? Number(tip.points || 0) : 0
+        total: counted ? Number(tip.points || 0) : 0,
+        categories: tipCategoryBreakdown(tip, match.result, counted),
+        fantasy: { goals: 0, wins: 0, total: 0 }
       }));
     const participantRows = [...profileRows, ...botRows].sort((a, b) => b.total - a.total);
     const teamRows = details.teamMatches
@@ -1027,7 +1066,20 @@ function renderPointDetails() {
                       <div class="ledger-detail-table">
                         <div class="ledger-detail-head"><span>Name</span><span>Tipp</span><span>Tipps</span><span>Top 5</span><span>Gesamt</span></div>
                         ${item.participantRows.length ? item.participantRows.map((row) => `
-                          <div><span>${escapeHtml(row.name)}</span><span>${row.tip}</span><span>${row.tipPoints}</span><span>${row.top5}</span><strong>${row.total}</strong></div>
+                          <details class="participant-score-detail">
+                            <summary><span><i></i>${escapeHtml(row.name)}</span><span>${row.tip}</span><span>${row.tipPoints}</span><span>${row.top5}</span><strong>${row.total}</strong></summary>
+                            <div class="score-category-list">
+                              <span class="score-result-note">Ergebnis ${escapeHtml(item.match.result || "\u2013")}</span>
+                              ${row.categories.length ? row.categories.map((category) => `
+                                <span><i></i>${escapeHtml(category.name)}<strong>+${category.points}</strong></span>
+                              `).join("") : '<span><i></i>Keine Tippkategorie erf&uuml;llt<strong>+0</strong></span>'}
+                              ${row.tipPoints !== row.categories.reduce((sum, category) => sum + category.points, 0)
+                                ? `<span><i></i>Weitere gespeicherte Tippwertung<strong>+${row.tipPoints - row.categories.reduce((sum, category) => sum + category.points, 0)}</strong></span>`
+                                : ""}
+                              ${row.fantasy.goals ? `<span><i></i>Top 5: Tore<strong>+${row.fantasy.goals}</strong></span>` : ""}
+                              ${row.fantasy.wins ? `<span><i></i>Top 5: Mannschaftssiege<strong>+${row.fantasy.wins}</strong></span>` : ""}
+                            </div>
+                          </details>
                         `).join("") : '<p class="ledger-empty">Keine Tipps f&uuml;r dieses Spiel.</p>'}
                       </div>
                     </section>
@@ -1428,10 +1480,22 @@ function updateAccountUi() {
 async function syncFromCloud() {
   const cloud = window.TippRadarCloud;
   if (!cloud?.league) return;
-  const [state, cloudTips, cloudTeamScores, allTips, cloudFantasy, standings, details] = await Promise.all([
-    cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores(), cloud.loadLeaguePredictions(),
-    cloud.loadFantasyPicks(), cloud.loadStandings(), cloud.loadPointDetails()
+  const [state, cloudTips] = await Promise.all([
+    cloud.loadState(), cloud.loadPredictions()
   ]);
+  const optionalResults = await Promise.allSettled([
+    cloud.loadTeamScores(), cloud.loadLeaguePredictions(), cloud.loadFantasyPicks(),
+    cloud.loadStandings(), cloud.loadPointDetails()
+  ]);
+  const [
+    cloudTeamScoresResult, allTipsResult, cloudFantasyResult, standingsResult, detailsResult
+  ] = optionalResults;
+  const cloudTeamScores = cloudTeamScoresResult.status === "fulfilled" ? cloudTeamScoresResult.value : {};
+  const allTips = allTipsResult.status === "fulfilled" ? allTipsResult.value : {};
+  const cloudFantasy = cloudFantasyResult.status === "fulfilled" ? cloudFantasyResult.value : [];
+  const standings = standingsResult.status === "fulfilled" ? standingsResult.value : [];
+  const details = detailsResult.status === "fulfilled" ? detailsResult.value : null;
+  const optionalFailures = optionalResults.filter((result) => result.status === "rejected");
   if (state) {
     const cleanedState = deduplicateBots(Array.isArray(state.teams) ? state.teams : teams);
     teams = cleanedState.teams;
@@ -1466,6 +1530,9 @@ async function syncFromCloud() {
   renderPointDetails();
   renderFantasyPicks();
   updateAccountUi();
+  if (optionalFailures.length) {
+    console.warn("Optionale Cloud-Bereiche konnten nicht geladen werden:", optionalFailures.map((result) => result.reason));
+  }
 }
 
 async function initializeCloud() {
@@ -1478,7 +1545,8 @@ async function initializeCloud() {
       await window.TippRadarCloud.saveBotPredictions(allBotPredictions());
     }
   } catch (error) {
-    showToast("Cloud nicht erreichbar", "Die App arbeitet vorerst lokal weiter.");
+    console.error("Cloud-Initialisierung fehlgeschlagen:", error);
+    showToast("Anmeldung nicht vollständig geladen", error.message || "Bitte die Seite einmal neu laden.");
   }
 }
 

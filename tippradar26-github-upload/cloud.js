@@ -144,11 +144,20 @@
 
   async function loadState() {
     if (!league) return null;
-    const { data, error } = await client
+    let { data, error } = await client
       .from("league_state")
       .select("teams, scoring_rules, scoring_start")
       .eq("league_id", league.id)
       .maybeSingle();
+    if (error && /scoring_start|column/i.test(error.message || "")) {
+      const fallback = await client
+        .from("league_state")
+        .select("teams, scoring_rules")
+        .eq("league_id", league.id)
+        .maybeSingle();
+      data = fallback.data ? { ...fallback.data, scoring_start: null } : null;
+      error = fallback.error;
+    }
     if (error) throw error;
     return data;
   }
