@@ -176,7 +176,7 @@
           <div class="ranking-table-wrap">
             <div class="table-heading"><strong>Aktuelle Tabelle</strong><span>Nach Spieltag 6</span></div>
             <table class="ranking-table">
-              <thead><tr><th>Rang</th><th>Spieler</th><th>Trend</th><th>Treffer</th><th>Punkte</th></tr></thead>
+              <thead><tr><th>Rang</th><th>Spieler</th><th>Tipps</th><th>Top 5</th><th>Gesamt</th></tr></thead>
               <tbody id="ranking-body"></tbody>
             </table>
           </div>
@@ -193,6 +193,14 @@
             </dl>
           </aside>
         </div>
+
+        <section class="points-ledger">
+          <div class="points-ledger-head">
+            <div><span class="section-kicker">Nachvollziehbare Wertung</span><h2>Punkte pro Spiel</h2><p>Tipp-, Top-5- und Team-Punkte einzeln aufgeschl&uuml;sselt.</p></div>
+            <span id="ledger-scoring-start">Wertungsstart wird geladen</span>
+          </div>
+          <div id="points-ledger-list"></div>
+        </section>
       </section>
 
       <section class="view" id="teams-view">
@@ -212,6 +220,15 @@
         </div>
         <p class="team-link-note">Wichtig f&uuml;r die Auswertung: Der Anzeigename bei der Anmeldung muss dem Spielernamen im Team entsprechen.</p>
         <p class="team-link-note model-note">RANK und STAT arbeiten mit einem festen FIFA-Ranglisten-Snapshot vom 19. November 2025. STAT berechnet daraus erwartete Tore; es sind keine Live-Quoten.</p>
+
+        <section class="scoring-start-card">
+          <div><span class="section-kicker">Nur Organisator</span><h2>Wertungsstart</h2><p>Spiele vor diesem Zeitpunkt bleiben sichtbar, z&auml;hlen aber nicht f&uuml;r Einzel- oder Teamwertung.</p></div>
+          <div class="scoring-start-form">
+            <input id="scoring-start" type="datetime-local" aria-label="Wertungsstart">
+            <button class="secondary-button" id="save-scoring-start">Wertungsstart speichern</button>
+          </div>
+          <small id="scoring-start-status">Noch kein Wertungsstart festgelegt.</small>
+        </section>
 
         <section class="scorer-admin" id="scorer-admin" hidden>
           <div><span class="section-kicker">Nur Organisator</span><h2>Torsch&uuml;tzen-Korrektur</h2><p>Die Tore werden automatisch von API-Football geladen. Hier kannst du nur bei Bedarf einen Eintrag korrigieren.</p></div>

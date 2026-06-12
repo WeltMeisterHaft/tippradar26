@@ -78,6 +78,8 @@ let teamScoreSummary = {};
 let leaguePredictions = {};
 let fantasyPicks = [];
 let profileStandings = [];
+let scoringStart = null;
+let pointDetails = null;
 let tournamentTeams = [...new Set(demoMatches.flatMap((match) => [match.home, match.away]))]
   .sort((a, b) => a.localeCompare(b, "de"));
 const squadCache = {};
@@ -141,12 +143,14 @@ async function loadOpenLigaMatches() {
     renderFantasyPicks();
     if (window.TippRadarCloud?.league?.role === "organizer") {
       await syncApiFootballEvents(normalized);
-      await Promise.all(matches.filter((match) => match.result).map((match) => {
+      for (const match of normalized.filter((item) => item.result && isMatchCounted(item))) {
         const [home, away] = match.result.split(":").map(Number);
-        return window.TippRadarCloud.scoreMatch(match.id, match.matchday, home, away).catch(() => {});
-      }));
+        await window.TippRadarCloud.scoreMatch(match.id, match.matchday, home, away).catch(() => {});
+      }
       teamScoreSummary = await window.TippRadarCloud.loadTeamScores();
+      pointDetails = await window.TippRadarCloud.loadPointDetails();
       renderTeams();
+      renderPointDetails();
     }
   } catch (error) {
     status.textContent = "Demo-Spielplan / OpenLigaDB nicht erreichbar";
@@ -159,7 +163,8 @@ function renderMatches() {
   const automatic = activeAutoStrategy !== "manual";
   matchesList.innerHTML = matches.map((match) => {
     const tip = savedTips[match.id] || {};
-    const open = isMatchOpen(match);
+    const counted = isMatchCounted(match);
+    const open = isMatchOpen(match) && counted;
     return `
       <article class="match-card ${open ? "" : "match-locked"}" data-match="${match.id}" data-kickoff="${match.kickoff}">
         <div class="match-meta"><strong>${match.time}</strong><span>${match.group}</span></div>
@@ -185,7 +190,9 @@ function renderMatches() {
           <span><small>RANK</small><b>FIFA-Rang</b></span>
           <span><small>STAT</small><b>Tormodell</b></span>
         </div>
-        ${automatic && open
+        ${!counted
+          ? '<div class="locked-label excluded-label">Au&szlig;er Wertung</div>'
+          : automatic && open
           ? `<div class="locked-label auto-label">AUTO · ${activeAutoStrategy.toUpperCase()}</div>`
           : (open ? "" : '<div class="locked-label">Tipp geschlossen</div>')}
       </article>`;
@@ -198,6 +205,25 @@ function renderMatches() {
 
 function isMatchOpen(match) {
   return !match.kickoff || Date.now() < new Date(match.kickoff).getTime();
+}
+
+function isMatchCounted(match) {
+  return !scoringStart || !match.kickoff
+    || new Date(match.kickoff).getTime() >= new Date(scoringStart).getTime();
+}
+
+function formatScoringStart(value) {
+  if (!value) return "Alle Spiele z\u00e4hlen";
+  return `Wertung ab ${new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Berlin"
+  }).format(new Date(value))}`;
+}
+
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+  return local.toISOString().slice(0, 16);
 }
 
 function collectTips() {
@@ -557,15 +583,15 @@ function renderTipMatrix() {
 function renderTeams() {
   const grid = document.querySelector("#team-grid");
   if (!grid) return;
-  const canRenamePlayers = !window.TippRadarCloud?.league
+  const canManageTeams = !window.TippRadarCloud?.league
     || window.TippRadarCloud.league.role === "organizer";
   if (!teams.length) {
     grid.innerHTML = `
       <div class="empty-teams">
         <span class="empty-ball">&#9673;</span>
         <h2>Noch keine Teams angelegt</h2>
-        <p>Starte mit eurem ersten Team. Danach kannst du Menschen oder kostenlose automatische Tipp-Spieler hinzuf&uuml;gen.</p>
-        <button class="primary-button" data-action="open-team">Erstes Team anlegen</button>
+        <p>${canManageTeams ? "Starte mit eurem ersten Team. Danach kannst du Menschen oder kostenlose automatische Tipp-Spieler hinzuf&uuml;gen." : "Der Organisator hat noch keine Teams angelegt."}</p>
+        ${canManageTeams ? '<button class="primary-button" data-action="open-team">Erstes Team anlegen</button>' : ""}
       </div>`;
     return;
   }
@@ -579,7 +605,7 @@ function renderTeams() {
           <div><span class="team-rank" style="background:${team.color}">${team.name.slice(0, 2).toUpperCase()}</span><span><strong>${escapeHtml(team.name)}</strong><small>${(team.category || "family").toUpperCase()} &middot; ${team.members.length} Spieler</small></span></div>
           <div class="team-head-right">
             <span class="team-live-points"><strong>${totalScore.toFixed(1)}</strong> Teampunkte</span>
-            <div class="team-actions"><button data-action="toggle-player-form">+ Spieler</button><button class="danger-button" data-action="delete-team" title="Team l&ouml;schen">&times;</button></div>
+            ${canManageTeams ? `<div class="team-actions"><button data-action="toggle-player-form">+ Spieler</button><button class="danger-button" data-action="delete-team" title="Team l&ouml;schen">&times;</button></div>` : ""}
           </div>
         </div>
         <div class="player-form" hidden>
@@ -605,16 +631,16 @@ function renderTeams() {
               <span class="member-name">
                 <span class="member-name-line">
                   <strong>${escapeHtml(member.name)}</strong>
-                  ${canRenamePlayers ? `<button class="member-edit" data-action="rename-player" title="Namen korrigieren" aria-label="${escapeHtml(member.name)} umbenennen">&#9998;</button>` : ""}
+                  ${canManageTeams ? `<button class="member-edit" data-action="rename-player" title="Namen korrigieren" aria-label="${escapeHtml(member.name)} umbenennen">&#9998;</button>` : ""}
                 </span>
                 <span class="member-meta">
                   ${member.bot
                     ? `<small class="role-badge bot">Auto</small>`
-                    : `<select class="member-role-select" data-action="member-role" aria-label="Rolle von ${escapeHtml(member.name)}">
+                    : (canManageTeams ? `<select class="member-role-select" data-action="member-role" aria-label="Rolle von ${escapeHtml(member.name)}">
                         <option value="lead" ${participantRole(member) === "lead" ? "selected" : ""}>Team-Lead</option>
                         <option value="adult" ${participantRole(member) === "adult" ? "selected" : ""}>Erwachsen</option>
                         <option value="child" ${participantRole(member) === "child" ? "selected" : ""}>Kind</option>
-                      </select>`}
+                      </select>` : `<small class="role-badge ${participantRole(member)}">${participantRoleNames[participantRole(member)]}</small>`)}
                   <small class="team-badge" style="--team-color:${team.color}">${escapeHtml(team.name)}</small>
                   ${!member.bot && profileAutoStrategy(member.name) !== "manual"
                     ? `<small class="role-badge bot">AUTO · ${profileAutoStrategy(member.name).toUpperCase()}</small>`
@@ -624,9 +650,9 @@ function renderTeams() {
               </span>
               <label class="weight-control">
                 <span>Faktor <b>${member.weight.toFixed(2)}</b></span>
-                <input type="range" min="0.75" max="1.25" step="0.05" value="${member.weight}" data-action="weight">
+                <input type="range" min="0.75" max="1.25" step="0.05" value="${member.weight}" data-action="weight" ${canManageTeams ? "" : "disabled"}>
               </label>
-              <button class="member-delete" data-action="delete-player" title="Spieler l&ouml;schen">&times;</button>
+              ${canManageTeams ? `<button class="member-delete" data-action="delete-player" title="Spieler l&ouml;schen">&times;</button>` : "<span></span>"}
             </div>`).join("") : `<div class="empty-members">Noch keine Spieler. F&uuml;ge den ersten Teilnehmer hinzu.</div>`}
         </div>
         <div class="team-card-foot">
@@ -760,9 +786,100 @@ function renderRanking() {
           <small class="team-badge" style="--team-color:${participant.teamColor}">${escapeHtml(participant.team)}</small>
         </span>
       </td>
-      <td><span class="trend flat">${participant.points.fantasy ? `Top 5 +${participant.points.fantasy}` : "&ndash;"}</span></td><td>0</td><td><strong>${participant.points.total}</strong></td>
+      <td>${participant.points.total - participant.points.fantasy}</td>
+      <td>${participant.points.fantasy}</td>
+      <td><strong>${participant.points.total}</strong></td>
     </tr>`).join("") : `
     <tr><td colspan="5" class="ranking-empty">Noch keine Spieler angelegt. Die Rangliste f&uuml;llt sich mit eurer Runde.</td></tr>`;
+}
+
+function renderPointDetails() {
+  const list = document.querySelector("#points-ledger-list");
+  const startLabel = document.querySelector("#ledger-scoring-start");
+  if (!list || !startLabel) return;
+  startLabel.textContent = formatScoringStart(scoringStart);
+  if (!pointDetails?.schedule?.length) {
+    list.innerHTML = '<div class="ledger-empty">Noch keine ausgewerteten Spiele vorhanden.</div>';
+    return;
+  }
+
+  const profileNames = Object.fromEntries(pointDetails.profiles.map((profile) => [profile.id, profile.display_name]));
+  const fantasyByKey = Object.fromEntries(pointDetails.fantasy.map((row) => [
+    `${row.profile_id}:${row.match_id}`,
+    Number(row.goal_points || 0) + Number(row.win_points || 0)
+  ]));
+  const teamNames = Object.fromEntries(teams.map((team) => [team.id, team.name]));
+  const rows = pointDetails.schedule
+    .filter((match) => new Date(match.kickoff).getTime() <= Date.now())
+    .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff));
+  const lastMatchByDay = {};
+  rows.forEach((match) => {
+    const current = lastMatchByDay[match.matchday];
+    if (!current || new Date(match.kickoff) > new Date(current.kickoff)) {
+      lastMatchByDay[match.matchday] = match;
+    }
+  });
+
+  list.innerHTML = rows.length ? rows.map((match, index) => {
+    const counted = isMatchCounted(match);
+    const profileRows = pointDetails.profileTips
+      .filter((tip) => String(tip.match_id) === String(match.match_id))
+      .map((tip) => {
+        const tipPoints = counted ? Number(tip.points || 0) : 0;
+        const top5 = counted ? Number(fantasyByKey[`${tip.profile_id}:${tip.match_id}`] || 0) : 0;
+        return {
+          name: profileNames[tip.profile_id] || "Unbekannt",
+          tip: `${tip.home_score}:${tip.away_score}`,
+          tipPoints, top5, total: tipPoints + top5
+        };
+      });
+    const botRows = pointDetails.bots
+      .filter((tip) => String(tip.match_id) === String(match.match_id))
+      .map((tip) => ({
+        name: `${tip.bot_name} (Auto)`, tip: `${tip.home_score}:${tip.away_score}`,
+        tipPoints: counted ? Number(tip.points || 0) : 0, top5: 0,
+        total: counted ? Number(tip.points || 0) : 0
+      }));
+    const participantRows = [...profileRows, ...botRows].sort((a, b) => b.total - a.total);
+    const teamRows = pointDetails.teamMatches
+      .filter((row) => String(row.match_id) === String(match.match_id))
+      .map((row) => ({
+        name: teamNames[row.team_id] || row.team_id,
+        base: counted ? Number(row.weighted_points || 0) : 0,
+        bonus: counted ? Number(row.match_bonus || 0) : 0
+      }));
+    const dayRows = String(lastMatchByDay[match.matchday]?.match_id) === String(match.match_id)
+      ? pointDetails.teamDays
+        .filter((row) => String(row.matchday) === String(match.matchday))
+        .map((row) => ({
+          name: teamNames[row.team_id] || row.team_id,
+          bonus: counted ? Number(row.bonus_points || 0) : 0
+        }))
+        .filter((row) => row.bonus)
+      : [];
+    return `
+      <details class="ledger-match ${counted ? "" : "excluded"}" ${index === 0 ? "open" : ""}>
+        <summary>
+          <strong>${escapeHtml(match.home_team)} - ${escapeHtml(match.away_team)}</strong>
+          <small>${counted ? `Spieltag ${escapeHtml(match.matchday)}` : "Au\u00dfer Wertung"}</small>
+        </summary>
+        <div class="ledger-section">
+          <h4>Teilnehmer</h4>
+          ${participantRows.length ? participantRows.map((row) => `
+            <div class="ledger-row"><span>${escapeHtml(row.name)}</span><span>Tipp ${row.tip}</span><span>Tipppunkte ${row.tipPoints}</span><span>Top 5 ${row.top5}</span><strong>${row.total}</strong></div>
+          `).join("") : '<div class="ledger-empty">Keine Tipps f&uuml;r dieses Spiel.</div>'}
+        </div>
+        <div class="ledger-section">
+          <h4>Teams</h4>
+          ${teamRows.length ? teamRows.map((row) => `
+            <div class="ledger-row"><span>${escapeHtml(row.name)}</span><span></span><span>Gewichtet ${row.base.toFixed(1)}</span><span>Bonus ${row.bonus.toFixed(1)}</span><strong>${(row.base + row.bonus).toFixed(1)}</strong></div>
+          `).join("") : '<div class="ledger-empty">Keine Teamwertung f&uuml;r dieses Spiel.</div>'}
+          ${dayRows.map((row) => `
+            <div class="ledger-row day-bonus-row"><span>${escapeHtml(row.name)}</span><span>Spieltag ${escapeHtml(match.matchday)}</span><span></span><span>Spieltagbonus</span><strong>+${row.bonus.toFixed(1)}</strong></div>
+          `).join("")}
+        </div>
+      </details>`;
+  }).join("") : '<div class="ledger-empty">Noch kein Spiel wurde beendet.</div>';
 }
 
 function renderRankChart(range = "all") {
@@ -1102,11 +1219,15 @@ function updateAccountUi() {
     document.querySelector("#cloud-organizer-name").textContent =
       `${cloud.organizerName || "Unbekannt"}${cloud.league.role === "organizer" ? " (du)" : ""}`;
     document.querySelector("#scorer-admin").hidden = cloud.league.role !== "organizer";
+    document.querySelector("#open-team-creator").hidden = cloud.league.role !== "organizer";
     const ownedProfiles = cloud.profiles.filter((profile) =>
       profile.account_user_id === cloud.session.user.id
       && (profile.is_primary || profile.profile_type === "child")
     );
+    const primaryProfile = ownedProfiles.find((profile) => profile.is_primary);
     document.querySelector("#current-account-type").value = cloud.league.accountType;
+    document.querySelector('#current-account-type option[value="family"]').disabled =
+      primaryProfile?.profile_type !== "lead" && cloud.league.role !== "organizer";
     const profileSelect = document.querySelector("#active-profile");
     profileSelect.innerHTML = ownedProfiles.map((profile) =>
       {
@@ -1123,6 +1244,10 @@ function updateAccountUi() {
     document.querySelector(".profile-auto-note").hidden = cloud.league.accountType !== "family";
     document.querySelector("#family-profile-creator").hidden = cloud.league.accountType !== "family";
     document.querySelector(".profile-access-note").hidden = cloud.league.accountType !== "family";
+    const startCard = document.querySelector(".scoring-start-card");
+    startCard.classList.toggle("readonly", cloud.league.role !== "organizer");
+    document.querySelector("#scoring-start").value = toDateTimeLocal(scoringStart);
+    document.querySelector("#scoring-start-status").textContent = formatScoringStart(scoringStart);
     setAccountPanel("cloud-account");
   }
 }
@@ -1130,13 +1255,14 @@ function updateAccountUi() {
 async function syncFromCloud() {
   const cloud = window.TippRadarCloud;
   if (!cloud?.league) return;
-  const [state, cloudTips, cloudTeamScores, allTips, cloudFantasy, standings] = await Promise.all([
+  const [state, cloudTips, cloudTeamScores, allTips, cloudFantasy, standings, details] = await Promise.all([
     cloud.loadState(), cloud.loadPredictions(), cloud.loadTeamScores(), cloud.loadLeaguePredictions(),
-    cloud.loadFantasyPicks(), cloud.loadStandings()
+    cloud.loadFantasyPicks(), cloud.loadStandings(), cloud.loadPointDetails()
   ]);
   if (state) {
     teams = Array.isArray(state.teams) ? state.teams : teams;
     scoringRules = Array.isArray(state.scoring_rules) && state.scoring_rules.length ? state.scoring_rules : scoringRules;
+    scoringStart = state.scoring_start || null;
     const storedRules = JSON.stringify(scoringRules);
     ensureTeamBonusRules();
     if (cloud.league.role === "organizer" && JSON.stringify(scoringRules) !== storedRules) {
@@ -1150,6 +1276,7 @@ async function syncFromCloud() {
   leaguePredictions = allTips;
   fantasyPicks = cloudFantasy;
   profileStandings = standings;
+  pointDetails = details;
   if (cloud.activeProfile?.display_name) {
     leaguePredictions[cloud.activeProfile.display_name] ||= {};
     Object.entries(cloudTips).forEach(([matchId, tip]) => {
@@ -1162,6 +1289,7 @@ async function syncFromCloud() {
   renderMatches();
   renderTipMatrix();
   renderRanking();
+  renderPointDetails();
   renderFantasyPicks();
   updateAccountUi();
 }
@@ -1306,6 +1434,20 @@ document.querySelector("#save-scorer").addEventListener("click", async () => {
     showToast("Nicht gespeichert", error.message);
   }
 });
+document.querySelector("#save-scoring-start").addEventListener("click", async () => {
+  const input = document.querySelector("#scoring-start");
+  if (!input.value) return showToast("Zeitpunkt fehlt", "Bitte Datum und Uhrzeit ausw\u00e4hlen.");
+  try {
+    const nextStart = new Date(input.value).toISOString();
+    await window.TippRadarCloud.setScoringStart(nextStart);
+    scoringStart = nextStart;
+    await loadOpenLigaMatches();
+    await syncFromCloud();
+    showToast("Wertungsstart gespeichert", formatScoringStart(scoringStart));
+  } catch (error) {
+    showToast("Wertungsstart nicht gespeichert", error.message);
+  }
+});
 document.querySelector("#sign-out").addEventListener("click", async () => {
   await window.TippRadarCloud.signOut();
   updateAccountUi();
@@ -1333,6 +1475,7 @@ renderTipMatrix();
 renderTeams();
 renderRules();
 renderRanking();
+renderPointDetails();
 fantasyPicks = JSON.parse(localStorage.getItem(fantasyStorageKey()) || "[]");
 renderFantasyPicks();
 renderScorerMatches();

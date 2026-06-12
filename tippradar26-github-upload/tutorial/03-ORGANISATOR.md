@@ -8,6 +8,8 @@
 4. Nur der Organisator kann Bewertungskategorien, Punktzahlen und Team-Boni aendern. Alle anderen sehen die Regeln nur lesend.
 5. Zusaetzliche Kategorien sind vorerst deaktiviert. Ein eigener Kategorie-Creator kann spaeter ergaenzt werden.
 6. Schreibfehler bei Teilnehmernamen ueber den kleinen Stift direkt neben dem Namen korrigieren. Tipps und Punkte bleiben dabei erhalten.
+7. Unter `Wertungsstart` Datum und Uhrzeit festlegen. Spiele mit frueherem Anpfiff bleiben sichtbar, zaehlen aber nicht.
+8. Unter `Rang & Form` die Punkte je Spiel fuer Teilnehmer und Teams kontrollieren.
 3. Gewichtungen kontrollieren.
 4. Punkte- und Teamregeln speichern.
 5. Einladungscode aus dem Kontofenster notieren.

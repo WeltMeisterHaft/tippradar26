@@ -146,7 +146,7 @@
     if (!league) return null;
     const { data, error } = await client
       .from("league_state")
-      .select("teams, scoring_rules")
+      .select("teams, scoring_rules, scoring_start")
       .eq("league_id", league.id)
       .maybeSingle();
     if (error) throw error;
@@ -190,6 +190,16 @@
       teams,
       scoring_rules: scoringRules,
       updated_at: new Date().toISOString()
+    });
+    if (error) throw error;
+  }
+
+  async function setScoringStart(scoringStart) {
+    if (!league || league.role !== "organizer") {
+      throw new Error("Nur der Organisator darf den Wertungsstart festlegen.");
+    }
+    const { error } = await client.rpc("set_league_scoring_start", {
+      target_start: scoringStart
     });
     if (error) throw error;
   }
@@ -352,13 +362,63 @@
       .select("profile_id, points").eq("league_id", league.id);
     const { data: fantasyPoints } = await client.from("fantasy_match_points")
       .select("profile_id, goal_points, win_points").eq("league_id", league.id);
-    return (allProfiles || []).map((profile) => ({
+    const { data: botPoints } = await client.from("bot_predictions")
+      .select("bot_id, bot_name, points").eq("league_id", league.id);
+    const humans = (allProfiles || []).map((profile) => ({
       ...profile,
       tipPoints: (tipPoints || []).filter((row) => row.profile_id === profile.id)
         .reduce((sum, row) => sum + Number(row.points || 0), 0),
       fantasyPoints: (fantasyPoints || []).filter((row) => row.profile_id === profile.id)
         .reduce((sum, row) => sum + Number(row.goal_points || 0) + Number(row.win_points || 0), 0)
     }));
+    const bots = Object.values((botPoints || []).reduce((result, row) => {
+      result[row.bot_id] ||= {
+        id: row.bot_id, display_name: row.bot_name, tipPoints: 0, fantasyPoints: 0
+      };
+      result[row.bot_id].tipPoints += Number(row.points || 0);
+      return result;
+    }, {}));
+    return [...humans, ...bots];
+  }
+
+  async function loadPointDetails() {
+    if (!league) return null;
+    const [
+      { data: profiles, error: profileError },
+      { data: profileTips, error: tipError },
+      { data: fantasy, error: fantasyError },
+      { data: bots, error: botError },
+      { data: schedule, error: scheduleError },
+      { data: teamMatches, error: teamMatchError },
+      { data: teamDays, error: teamDayError }
+    ] = await Promise.all([
+      client.from("participant_profiles")
+        .select("id, display_name").eq("league_id", league.id),
+      client.from("profile_predictions")
+        .select("profile_id, match_id, home_score, away_score, points").eq("league_id", league.id),
+      client.from("fantasy_match_points")
+        .select("profile_id, match_id, goal_points, win_points").eq("league_id", league.id),
+      client.from("bot_predictions")
+        .select("bot_id, bot_name, team_id, match_id, home_score, away_score, points").eq("league_id", league.id),
+      client.from("match_schedule")
+        .select("match_id, kickoff, matchday, home_team, away_team").eq("league_id", league.id).order("kickoff"),
+      client.from("team_match_scores")
+        .select("team_id, match_id, matchday, weighted_points, match_bonus").eq("league_id", league.id),
+      client.from("team_matchday_bonuses")
+        .select("team_id, matchday, weighted_points, bonus_points").eq("league_id", league.id)
+    ]);
+    const firstError = profileError || tipError || fantasyError || botError
+      || scheduleError || teamMatchError || teamDayError;
+    if (firstError) throw firstError;
+    return {
+      profiles: profiles || [],
+      profileTips: profileTips || [],
+      fantasy: fantasy || [],
+      bots: bots || [],
+      schedule: schedule || [],
+      teamMatches: teamMatches || [],
+      teamDays: teamDays || []
+    };
   }
 
   async function saveBotPredictions(tips) {
@@ -391,10 +451,10 @@
   window.TippRadarCloud = {
     init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
     loadProfiles, selectProfile, addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
-    loadState, saveState, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
+    loadState, saveState, setScoringStart, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
     loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadStandings,
     loadFootballDay, loadTeamSquad, loadFootballEvents,
-    loadTeamScores, syncSchedule, scoreMatch,
+    loadTeamScores, loadPointDetails, syncSchedule, scoreMatch,
     get configured() { return configured; },
     get session() { return session; },
     get league() { return league; },
