@@ -1143,6 +1143,7 @@ function allBotPredictions() {
 const participantRoleNames = {
   lead: "Team-Lead",
   adult: "Erwachsen",
+  youth: "Jugend",
   child: "Kind",
   bot: "Auto"
 };
@@ -1501,6 +1502,7 @@ function renderTeams() {
           <select data-field="player-role">
             <option value="lead">Team-Lead</option>
             <option value="adult">Erwachsene/r</option>
+            <option value="youth">Jugendliche/r mit eigenem Zugang</option>
             <option value="child">Kind</option>
           </select>
           <select data-field="bot-strategy" hidden>
@@ -1526,6 +1528,7 @@ function renderTeams() {
                     : (canManageTeams ? `<select class="member-role-select" data-action="member-role" aria-label="Rolle von ${escapeHtml(member.name)}">
                         <option value="lead" ${participantRole(member) === "lead" ? "selected" : ""}>Team-Lead</option>
                         <option value="adult" ${participantRole(member) === "adult" ? "selected" : ""}>Erwachsen</option>
+                        <option value="youth" ${participantRole(member) === "youth" ? "selected" : ""}>Jugend</option>
                         <option value="child" ${participantRole(member) === "child" ? "selected" : ""}>Kind</option>
                       </select>` : `<small class="role-badge ${participantRole(member)}">${participantRoleNames[participantRole(member)]}</small>`)}
                   <small class="team-badge" style="--team-color:${team.color}">${escapeHtml(team.name)}</small>
@@ -2210,9 +2213,44 @@ function setAccountPanel(name) {
   });
 }
 
+function ownedTippingProfiles(cloud) {
+  if (!cloud?.session) return [];
+  return cloud.profiles.filter((profile) =>
+    profile.account_user_id === cloud.session.user.id
+    && (profile.is_primary || profile.profile_type === "child")
+  );
+}
+
+function profileOptionMarkup(profiles, activeProfile) {
+  return profiles.map((profile) => {
+    const team = teams.find((item) => item.members.some((member) =>
+      member.name.trim().toLowerCase() === profile.display_name.trim().toLowerCase()
+    ));
+    const role = participantRoleNames[profile.profile_type] || "Erwachsen";
+    return `<option value="${profile.id}" ${profile.id === activeProfile?.id ? "selected" : ""}>${escapeHtml(profile.display_name)} / ${role}${team ? ` / ${escapeHtml(team.name)}` : " / noch ohne Team"}</option>`;
+  }).join("");
+}
+
+function updateProfileSelectors(cloud, ownedProfiles) {
+  const options = profileOptionMarkup(ownedProfiles, cloud.activeProfile);
+  const accountSelect = document.querySelector("#active-profile");
+  const tipSelect = document.querySelector("#tip-active-profile");
+  accountSelect.innerHTML = options;
+  tipSelect.innerHTML = options;
+  const primary = ownedProfiles.find((profile) => profile.is_primary);
+  const childCount = ownedProfiles.filter((profile) => profile.profile_type === "child").length;
+  document.querySelector("#tip-profile-heading").textContent =
+    `${cloud.activeProfile?.display_name || primary?.display_name || "Profil"} tippt gerade`;
+  document.querySelector("#tip-profile-access").textContent = primary?.profile_type === "lead"
+    ? `Als Team-Lead kannst du dein eigenes Profil und ${childCount ? `${childCount} Kinderprofil${childCount === 1 ? "" : "e"}` : "angelegte Kinderprofile"} auswählen.`
+    : "Mit deinem eigenen Zugang kannst du ausschließlich für dich selbst tippen.";
+  document.querySelector("#tip-profile-bar").hidden = false;
+}
+
 function updateAccountUi() {
   const cloud = window.TippRadarCloud;
   const avatar = document.querySelector("#account-avatar");
+  document.querySelector("#tip-profile-bar").hidden = true;
   if (!cloud?.configured) {
     document.querySelector("#account-name").textContent = "Lokal";
     document.querySelector("#account-status").textContent = "Nur auf diesem Ger\u00e4t";
@@ -2238,24 +2276,12 @@ function updateAccountUi() {
       `${cloud.organizerName || "Unbekannt"}${cloud.league.role === "organizer" ? " (du)" : ""}`;
     document.querySelector("#scorer-admin").hidden = cloud.league.role !== "organizer";
     document.querySelector("#open-team-creator").hidden = cloud.league.role !== "organizer";
-    const ownedProfiles = cloud.profiles.filter((profile) =>
-      profile.account_user_id === cloud.session.user.id
-      && (profile.is_primary || profile.profile_type === "child")
-    );
+    const ownedProfiles = ownedTippingProfiles(cloud);
     const primaryProfile = ownedProfiles.find((profile) => profile.is_primary);
     document.querySelector("#current-account-type").value = cloud.league.accountType;
     document.querySelector('#current-account-type option[value="family"]').disabled =
       primaryProfile?.profile_type !== "lead" && cloud.league.role !== "organizer";
-    const profileSelect = document.querySelector("#active-profile");
-    profileSelect.innerHTML = ownedProfiles.map((profile) =>
-      {
-        const team = teams.find((item) => item.members.some((member) =>
-          member.name.trim().toLowerCase() === profile.display_name.trim().toLowerCase()
-        ));
-        const role = participantRoleNames[profile.profile_type] || "Erwachsen";
-        return `<option value="${profile.id}" ${profile.id === cloud.activeProfile?.id ? "selected" : ""}>${escapeHtml(profile.display_name)} / ${role}${team ? ` / ${escapeHtml(team.name)}` : " / noch ohne Team"}</option>`;
-      }
-    ).join("");
+    updateProfileSelectors(cloud, ownedProfiles);
     const autoSelect = document.querySelector("#profile-auto-strategy");
     autoSelect.value = cloud.activeProfile?.auto_strategy || "manual";
     document.querySelector("#profile-auto-field").hidden = cloud.league.accountType !== "family";
@@ -2396,11 +2422,29 @@ document.querySelector("#create-league").addEventListener("click", async () => {
     showToast("Erstellen fehlgeschlagen", error.message);
   }
 });
-document.querySelector("#active-profile").addEventListener("change", async (event) => {
-  window.TippRadarCloud.selectProfile(event.target.value);
-  await syncFromCloud();
-  showToast("Profil gewechselt", `${window.TippRadarCloud.activeProfile.display_name} tippt jetzt.`);
-});
+async function switchActiveProfile(profileId, sourceSelect) {
+  const cloud = window.TippRadarCloud;
+  if (!cloud?.activeProfile || profileId === cloud.activeProfile.id) return;
+  const previousProfile = cloud.activeProfile;
+  try {
+    const draft = collectTips();
+    await cloud.savePredictions(draft);
+    const selected = cloud.selectProfile(profileId);
+    if (!selected) throw new Error("Dieses Profil darf von deinem Konto nicht verwendet werden.");
+    await syncFromCloud();
+    showToast("Tipp-Profil gewechselt", `${cloud.activeProfile.display_name} tippt jetzt.`);
+  } catch (error) {
+    sourceSelect.value = previousProfile.id;
+    showToast("Profil nicht gewechselt", error.message);
+  }
+}
+
+document.querySelector("#active-profile").addEventListener("change", (event) =>
+  switchActiveProfile(event.target.value, event.target)
+);
+document.querySelector("#tip-active-profile").addEventListener("change", (event) =>
+  switchActiveProfile(event.target.value, event.target)
+);
 document.querySelector("#profile-auto-strategy").addEventListener("change", async (event) => {
   const cloud = window.TippRadarCloud;
   const profile = cloud.activeProfile;

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260612-1745">
+  <link rel="stylesheet" href="styles.css?v=20260612-1830">
 </head>
 <body>
   <div class="app-shell">
@@ -102,6 +102,17 @@
           <p>Einfach Ergebnis eintragen und mitfiebern. Gewertet wird der Spielstand nach 90 Minuten.</p>
           <div class="data-status"><i></i><span id="match-data-status">OpenLigaDB wird verbunden</span></div>
         </div>
+        <section class="tip-profile-bar" id="tip-profile-bar" hidden>
+          <div>
+            <span class="section-kicker">Aktives Tipp-Profil</span>
+            <strong id="tip-profile-heading">Wer tippt gerade?</strong>
+            <small id="tip-profile-access">Deine erlaubten Profile werden geladen.</small>
+          </div>
+          <label>
+            <span>Tipps erfassen f&uuml;r</span>
+            <select id="tip-active-profile"><option value="">Profile werden geladen</option></select>
+          </label>
+        </section>
         <div class="date-tabs" id="date-tabs" role="tablist" aria-label="Spieltage"></div>
         <p class="match-view-note">Du kannst die n&auml;chsten 12 Spiele kompakt bearbeiten, alle offenen Spiele anzeigen oder gezielt einen Kalendertag ausw&auml;hlen. Beim Wechsel bleiben deine Eingaben als Entwurf erhalten.</p>
         <div class="model-info">
@@ -312,7 +323,7 @@
         </section>
       </section>
     </main>
-    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.12-1745</span></footer>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.12-1830</span></footer>
 
     <nav class="mobile-nav" aria-label="Mobile Navigation">
       <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
@@ -363,7 +374,7 @@
               <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Kindes">
               <button id="add-family-profile">+ Kinderprofil</button>
             </div>
-            <p class="profile-access-note">Erwachsene melden sich mit eigener E-Mail an. Der Family-Team-Lead kann sein eigenes Profil und die Kinderprofile verwalten.</p>
+            <p class="profile-access-note">Erwachsene und Jugendliche mit eigenem Zugang melden sich mit eigener E-Mail an. Unter 16 Jahren bitte nur mit Zustimmung der Eltern. Kinderprofile werden vom Family-Team-Lead verwaltet.</p>
           </div>
           <button class="secondary-button full-button" id="sign-out">Abmelden</button>
         </div>
@@ -371,8 +382,8 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260612-1745"></script>
-  <script src="cloud.js?v=20260612-1745"></script>
-  <script src="app.js?v=20260612-1745"></script>
+  <script src="config.js?v=20260612-1830"></script>
+  <script src="cloud.js?v=20260612-1830"></script>
+  <script src="app.js?v=20260612-1830"></script>
 </body>
 </html>

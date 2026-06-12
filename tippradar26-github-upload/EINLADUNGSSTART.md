@@ -12,6 +12,7 @@ Im SQL Editor nacheinander vollstaendig ausfuehren:
 6. `06-migration-profile-name-editor.sql`
 7. `07-migration-strict-profile-access.sql`
 8. `08-migration-scoring-start-ledger.sql`
+9. `migration-youth-access.sql`
 
 `Success. No rows returned` ist jeweils die erwartete Rueckmeldung.
 
@@ -37,6 +38,7 @@ Den Erwachsenen schicken:
 - Adresse: `https://tippradar26.vercel.app`
 - Einladungscode aus dem Kontofenster
 - Hinweis: Erwachsene melden sich jeweils mit eigener E-Mail an und tragen exakt ihren vorbereiteten Anzeigenamen ein.
+- Jugendliche mit der Rolle `Jugend` melden sich ebenfalls mit eigener E-Mail an. Unter 16 Jahren bitte nur mit Zustimmung der Eltern.
 
 Bei `Family` kann die eingeladene Person anschliessend Kinderprofile ohne weitere E-Mail-Adresse anlegen.
 
