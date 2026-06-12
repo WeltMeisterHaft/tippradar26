@@ -22,7 +22,7 @@ let matches = [...demoMatches];
 
 const teamStorageKey = "tippradar26-teams-v2";
 const ruleStorageKey = "tippradar26-rules-v2";
-let teams = JSON.parse(localStorage.getItem(teamStorageKey) || "[]");
+let teams = deduplicateBots(JSON.parse(localStorage.getItem(teamStorageKey) || "[]")).teams;
 let scoringRules = JSON.parse(localStorage.getItem(ruleStorageKey) || "null") || [
   { id: "exact", criterion: "exact", name: "Exaktes Ergebnis", points: 4, locked: true },
   { id: "difference", criterion: "goal_difference", name: "Richtige Tordifferenz", points: 3, locked: true },
@@ -83,6 +83,7 @@ let pointDetails = null;
 let tournamentTeams = [...new Set(demoMatches.flatMap((match) => [match.home, match.away]))]
   .sort((a, b) => a.localeCompare(b, "de"));
 const squadCache = {};
+const squadRequests = {};
 const matchesList = document.querySelector("#matches-list");
 const toast = document.querySelector("#toast");
 
@@ -390,6 +391,25 @@ function currentParticipants() {
   })));
 }
 
+function deduplicateBots(sourceTeams) {
+  const seenNames = new Set();
+  let changed = false;
+  const cleanedTeams = (Array.isArray(sourceTeams) ? sourceTeams : []).map((team) => ({
+    ...team,
+    members: (Array.isArray(team.members) ? team.members : []).filter((member) => {
+      if (!member.bot) return true;
+      const key = normalizedTeamName(member.name);
+      if (!key || seenNames.has(key)) {
+        changed = true;
+        return false;
+      }
+      seenNames.add(key);
+      return true;
+    })
+  }));
+  return { teams: cleanedTeams, changed };
+}
+
 function fantasyStorageKey() {
   return `tippradar26-fantasy-${window.TippRadarCloud?.activeProfile?.id || "local"}`;
 }
@@ -465,17 +485,22 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
     playerSelect.innerHTML = '<option value="">Kader wird geladen</option>';
   }
   try {
-    squadCache[cacheKey] ||= await window.TippRadarCloud.loadTeamSquad(teamName);
+    if (!squadCache[cacheKey]) {
+      squadRequests[cacheKey] ||= window.TippRadarCloud.loadTeamSquad(teamName);
+      squadCache[cacheKey] = await squadRequests[cacheKey];
+    }
     const players = squadCache[cacheKey].players || [];
     const currentSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
     if (!currentSelect) return;
-    currentSelect.disabled = false;
-    currentSelect.innerHTML = `<option value="">Spieler w&auml;hlen</option>${players.map((player) =>
+    currentSelect.disabled = !players.length;
+    currentSelect.innerHTML = `<option value="">${players.length ? "Spieler w&auml;hlen" : "Kader noch nicht ver\u00f6ffentlicht"}</option>${players.map((player) =>
       `<option value="${player.id}" ${String(player.id) === String(selectedPlayerId) ? "selected" : ""}>${escapeHtml(playerOptionLabel(player))}</option>`
     ).join("")}`;
   } catch (error) {
-    if (playerSelect) playerSelect.innerHTML = '<option value="">Kader nicht erreichbar</option>';
-    showToast("Kader nicht geladen", `${teamName}: ${error.message}`);
+    delete squadRequests[cacheKey];
+    const currentSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
+    if (currentSelect) currentSelect.innerHTML = '<option value="">Kader momentan nicht erreichbar</option>';
+    showToast("Kader momentan nicht erreichbar", `${teamName}: ${error.message}`);
   }
 }
 
@@ -599,6 +624,8 @@ function renderTeams() {
     const weightedTotal = team.members.reduce((sum, member) => sum + member.weight, 0);
     const score = teamScoreSummary[team.id] || { base: 0, matchBonus: 0, matchdayBonus: 0 };
     const totalScore = score.base + score.matchBonus + score.matchdayBonus;
+    const matchRulePoints = Number(scoringRules.find((rule) => rule.criterion === "team_best_match")?.points || 0);
+    const dayRulePoints = Number(scoringRules.find((rule) => rule.criterion === "team_best_matchday")?.points || 0);
     return `
       <article class="team-card" data-team-id="${team.id}" style="--team-color:${team.color}">
         <div class="team-card-head">
@@ -661,10 +688,11 @@ function renderTeams() {
           <em>${team.members.length ? "automatisch ausgeglichen" : "noch ohne Gewichtung"}</em>
         </div>
         <div class="team-bonus-strip">
-          <span>Basis <strong>${score.base.toFixed(1)}</strong></span>
-          <span>Beste Spiele <strong>+${score.matchBonus.toFixed(1)}</strong></span>
-          <span>Beste Spieltage <strong>+${score.matchdayBonus.toFixed(1)}</strong></span>
+          <span>Gewichtete Top 5 <strong>${score.base.toFixed(1)}</strong></span>
+          <span>Bestes Team je Spiel <strong>${score.matchWins || 0} &times; ${matchRulePoints} = +${score.matchBonus.toFixed(1)}</strong></span>
+          <span>Bestes Team je Spieltag <strong>${score.matchdayWins || 0} &times; ${dayRulePoints} = +${score.matchdayBonus.toFixed(1)}</strong></span>
         </div>
+        <p class="team-score-explanation">Basis: Pro Spieltag z&auml;hlen die f&uuml;nf besten gewichteten Teilnehmer. Bei Punktgleichstand erhalten alle bestplatzierten Teams den jeweiligen Bonus. Die Einzelwerte stehen unter Rang &amp; Form.</p>
       </article>`;
   }).join("");
 }
@@ -812,15 +840,8 @@ function renderPointDetails() {
   const rows = pointDetails.schedule
     .filter((match) => new Date(match.kickoff).getTime() <= Date.now())
     .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff));
-  const lastMatchByDay = {};
-  rows.forEach((match) => {
-    const current = lastMatchByDay[match.matchday];
-    if (!current || new Date(match.kickoff) > new Date(current.kickoff)) {
-      lastMatchByDay[match.matchday] = match;
-    }
-  });
 
-  list.innerHTML = rows.length ? rows.map((match, index) => {
+  function matchBreakdown(match) {
     const counted = isMatchCounted(match);
     const profileRows = pointDetails.profileTips
       .filter((tip) => String(tip.match_id) === String(match.match_id))
@@ -848,38 +869,91 @@ function renderPointDetails() {
         base: counted ? Number(row.weighted_points || 0) : 0,
         bonus: counted ? Number(row.match_bonus || 0) : 0
       }));
-    const dayRows = String(lastMatchByDay[match.matchday]?.match_id) === String(match.match_id)
-      ? pointDetails.teamDays
-        .filter((row) => String(row.matchday) === String(match.matchday))
+    return {
+      match, counted, participantRows, teamRows,
+      tipPoints: participantRows.reduce((sum, row) => sum + row.tipPoints, 0),
+      top5: participantRows.reduce((sum, row) => sum + row.top5, 0),
+      teamBase: teamRows.reduce((sum, row) => sum + row.base, 0),
+      matchBonus: teamRows.reduce((sum, row) => sum + row.bonus, 0)
+    };
+  }
+
+  const matchesByDay = Object.values(rows.reduce((groups, match) => {
+    const key = String(match.matchday);
+    groups[key] ||= { matchday: key, matches: [], latest: 0 };
+    const breakdown = matchBreakdown(match);
+    groups[key].matches.push(breakdown);
+    groups[key].latest = Math.max(groups[key].latest, new Date(match.kickoff).getTime());
+    return groups;
+  }, {})).sort((a, b) => b.latest - a.latest);
+
+  list.innerHTML = matchesByDay.length ? `
+    <div class="ledger-table ledger-table-head" aria-hidden="true">
+      <span>Spieltag / Spiel</span><span>TN-Tipps</span><span>TN Top 5</span><span>Team Top 5</span><span>Spielbonus</span><span>ST-Bonus</span>
+    </div>
+    ${matchesByDay.map((day, dayIndex) => {
+      const dayRows = pointDetails.teamDays
+        .filter((row) => String(row.matchday) === day.matchday)
         .map((row) => ({
           name: teamNames[row.team_id] || row.team_id,
-          bonus: counted ? Number(row.bonus_points || 0) : 0
-        }))
-        .filter((row) => row.bonus)
-      : [];
-    return `
-      <details class="ledger-match ${counted ? "" : "excluded"}" ${index === 0 ? "open" : ""}>
-        <summary>
-          <strong>${escapeHtml(match.home_team)} - ${escapeHtml(match.away_team)}</strong>
-          <small>${counted ? `Spieltag ${escapeHtml(match.matchday)}` : "Au\u00dfer Wertung"}</small>
-        </summary>
-        <div class="ledger-section">
-          <h4>Teilnehmer</h4>
-          ${participantRows.length ? participantRows.map((row) => `
-            <div class="ledger-row"><span>${escapeHtml(row.name)}</span><span>Tipp ${row.tip}</span><span>Tipppunkte ${row.tipPoints}</span><span>Top 5 ${row.top5}</span><strong>${row.total}</strong></div>
-          `).join("") : '<div class="ledger-empty">Keine Tipps f&uuml;r dieses Spiel.</div>'}
-        </div>
-        <div class="ledger-section">
-          <h4>Teams</h4>
-          ${teamRows.length ? teamRows.map((row) => `
-            <div class="ledger-row"><span>${escapeHtml(row.name)}</span><span></span><span>Gewichtet ${row.base.toFixed(1)}</span><span>Bonus ${row.bonus.toFixed(1)}</span><strong>${(row.base + row.bonus).toFixed(1)}</strong></div>
-          `).join("") : '<div class="ledger-empty">Keine Teamwertung f&uuml;r dieses Spiel.</div>'}
-          ${dayRows.map((row) => `
-            <div class="ledger-row day-bonus-row"><span>${escapeHtml(row.name)}</span><span>Spieltag ${escapeHtml(match.matchday)}</span><span></span><span>Spieltagbonus</span><strong>+${row.bonus.toFixed(1)}</strong></div>
-          `).join("")}
-        </div>
-      </details>`;
-  }).join("") : '<div class="ledger-empty">Noch kein Spiel wurde beendet.</div>';
+          base: Number(row.weighted_points || 0),
+          bonus: Number(row.bonus_points || 0)
+        }));
+      const totals = day.matches.reduce((sum, item) => ({
+        tips: sum.tips + item.tipPoints,
+        top5: sum.top5 + item.top5,
+        teamBase: sum.teamBase + item.teamBase,
+        bonus: sum.bonus + item.matchBonus
+      }), { tips: 0, top5: 0, teamBase: 0, bonus: 0 });
+      const dayBonus = dayRows.reduce((sum, row) => sum + row.bonus, 0);
+      return `
+        <details class="ledger-day" ${dayIndex === 0 ? "open" : ""}>
+          <summary class="ledger-table ledger-day-row">
+            <span><i></i><strong>Spieltag ${escapeHtml(day.matchday)}</strong><small>${day.matches.length} Spiele</small></span>
+            <span>${totals.tips}</span><span>${totals.top5}</span><span>${totals.teamBase.toFixed(1)}</span>
+            <span>+${totals.bonus.toFixed(1)}</span><strong>+${dayBonus.toFixed(1)}</strong>
+          </summary>
+          <div class="ledger-day-content">
+            ${day.matches.map((item) => {
+              return `
+                <details class="ledger-game ${item.counted ? "" : "excluded"}">
+                  <summary class="ledger-table ledger-game-row">
+                    <span><i></i><strong>${escapeHtml(item.match.home_team)} - ${escapeHtml(item.match.away_team)}</strong><small>${item.counted ? "Einzelspiel" : "Au\u00dfer Wertung"}</small></span>
+                    <span>${item.tipPoints}</span><span>${item.top5}</span><span>${item.teamBase.toFixed(1)}</span>
+                    <span>+${item.matchBonus.toFixed(1)}</span><strong>&ndash;</strong>
+                  </summary>
+                  <div class="ledger-detail-grid">
+                    <section>
+                      <h4>Teilnehmer</h4>
+                      <div class="ledger-detail-table">
+                        <div class="ledger-detail-head"><span>Name</span><span>Tipp</span><span>Tipps</span><span>Top 5</span><span>Gesamt</span></div>
+                        ${item.participantRows.length ? item.participantRows.map((row) => `
+                          <div><span>${escapeHtml(row.name)}</span><span>${row.tip}</span><span>${row.tipPoints}</span><span>${row.top5}</span><strong>${row.total}</strong></div>
+                        `).join("") : '<p class="ledger-empty">Keine Tipps f&uuml;r dieses Spiel.</p>'}
+                      </div>
+                    </section>
+                    <section>
+                      <h4>Teams</h4>
+                      <div class="ledger-detail-table team-detail-table">
+                        <div class="ledger-detail-head"><span>Team</span><span></span><span>Top 5</span><span>Spielbonus</span><span>Gesamt</span></div>
+                        ${item.teamRows.length ? item.teamRows.map((row) => `
+                          <div><span>${escapeHtml(row.name)}</span><span></span><span>${row.base.toFixed(1)}</span><span>+${row.bonus.toFixed(1)}</span><strong>${(row.base + row.bonus).toFixed(1)}</strong></div>
+                        `).join("") : '<p class="ledger-empty">Keine Teamwertung f&uuml;r dieses Spiel.</p>'}
+                      </div>
+                    </section>
+                  </div>
+                </details>`;
+            }).join("")}
+            <div class="ledger-day-bonus">
+              <strong>Spieltagbonus</strong>
+              ${dayRows.length ? dayRows.map((row) => `
+                <span>${escapeHtml(row.name)}: Top-5-Summe ${row.base.toFixed(1)} / Bonus <b>+${row.bonus.toFixed(1)}</b></span>
+              `).join("") : "<span>Noch keine Spieltagwertung vorhanden.</span>"}
+            </div>
+          </div>
+        </details>`;
+    }).join("")}
+  ` : '<div class="ledger-empty">Noch kein Spiel wurde beendet.</div>';
 }
 
 function renderRankChart(range = "all") {
@@ -1260,12 +1334,13 @@ async function syncFromCloud() {
     cloud.loadFantasyPicks(), cloud.loadStandings(), cloud.loadPointDetails()
   ]);
   if (state) {
-    teams = Array.isArray(state.teams) ? state.teams : teams;
+    const cleanedState = deduplicateBots(Array.isArray(state.teams) ? state.teams : teams);
+    teams = cleanedState.teams;
     scoringRules = Array.isArray(state.scoring_rules) && state.scoring_rules.length ? state.scoring_rules : scoringRules;
     scoringStart = state.scoring_start || null;
     const storedRules = JSON.stringify(scoringRules);
     ensureTeamBonusRules();
-    if (cloud.league.role === "organizer" && JSON.stringify(scoringRules) !== storedRules) {
+    if (cloud.league.role === "organizer" && (JSON.stringify(scoringRules) !== storedRules || cleanedState.changed)) {
       await cloud.saveState(teams, scoringRules);
     }
     localStorage.setItem(teamStorageKey, JSON.stringify(teams));
@@ -1447,6 +1522,16 @@ document.querySelector("#save-scoring-start").addEventListener("click", async ()
   } catch (error) {
     showToast("Wertungsstart nicht gespeichert", error.message);
   }
+});
+document.querySelector("#ledger-expand-all").addEventListener("click", () => {
+  document.querySelectorAll("#points-ledger-list details").forEach((row) => {
+    row.open = true;
+  });
+});
+document.querySelector("#ledger-collapse-all").addEventListener("click", () => {
+  document.querySelectorAll("#points-ledger-list details").forEach((row) => {
+    row.open = false;
+  });
 });
 document.querySelector("#sign-out").addEventListener("click", async () => {
   await window.TippRadarCloud.signOut();

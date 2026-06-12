@@ -19,6 +19,19 @@ async function apiRequest(path, key) {
   if (!result.ok) {
     throw new Error(body?.message || `API-Football antwortet mit ${result.status}`);
   }
+  const apiErrors = body?.errors;
+  const errorMessages = Array.isArray(apiErrors)
+    ? apiErrors.filter(Boolean)
+    : Object.values(apiErrors || {}).filter(Boolean);
+  if (errorMessages.length) {
+    const message = errorMessages.map((error) =>
+      typeof error === "string" ? error : JSON.stringify(error)
+    ).join(" / ");
+    if (/limit|request|plan/i.test(message)) {
+      throw new Error(`Kostenlose API-Grenze erreicht oder Tarifzugriff fehlt: ${message}`);
+    }
+    throw new Error(message);
+  }
   return body;
 }
 
@@ -57,7 +70,17 @@ const teamAliases = {
   "schweiz": "Switzerland", "osterreich": "Austria", "turkei": "Turkey",
   "danemark": "Denmark", "agypten": "Egypt", "elfenbeinkuste": "Ivory Coast",
   "neuseeland": "New Zealand", "saudi-arabien": "Saudi Arabia",
-  "bosnien-herzegowina": "Bosnia and Herzegovina", "tschechien": "Czech Republic"
+  "bosnien-herzegowina": "Bosnia and Herzegovina", "tschechien": "Czech Republic",
+  "kanada": "Canada", "japan": "Japan", "marokko": "Morocco",
+  "senegal": "Senegal", "uruguay": "Uruguay", "ecuador": "Ecuador",
+  "australien": "Australia", "norwegen": "Norway", "ukraine": "Ukraine",
+  "polen": "Poland", "schottland": "Scotland", "serbien": "Serbia",
+  "paraguay": "Paraguay", "algerien": "Algeria", "tunesien": "Tunisia",
+  "nigeria": "Nigeria", "kamerun": "Cameroon", "costa rica": "Costa Rica",
+  "katar": "Qatar", "irak": "Iraq", "jamaika": "Jamaica",
+  "usbekistan": "Uzbekistan", "jordanien": "Jordan",
+  "kap verde": "Cape Verde", "curacao": "Curaçao",
+  "bosnien und herzegowina": "Bosnia and Herzegovina"
 };
 
 function plain(value) {
@@ -170,7 +193,9 @@ module.exports = async function handler(request, response) {
       ).sort((a, b) => a.name.localeCompare(b.name));
       send(response, 200, {
         ok: true, requestedName, teamId: selected.team.id,
-        team: selected.team.name, players
+        team: selected.team.name, players,
+        available: players.length > 0,
+        message: players.length ? null : `Der Kader von ${requestedName} ist bei API-Football noch nicht veroeffentlicht.`
       }, 86400);
       return;
     }

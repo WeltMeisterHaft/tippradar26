@@ -252,19 +252,21 @@
   async function loadTeamScores() {
     if (!league) return {};
     const [{ data: matchScores, error: matchError }, { data: dayScores, error: dayError }] = await Promise.all([
-      client.from("team_match_scores").select("team_id, match_bonus").eq("league_id", league.id),
-      client.from("team_matchday_bonuses").select("team_id, weighted_points, bonus_points").eq("league_id", league.id)
+      client.from("team_match_scores").select("team_id, match_id, match_bonus").eq("league_id", league.id),
+      client.from("team_matchday_bonuses").select("team_id, matchday, weighted_points, bonus_points").eq("league_id", league.id)
     ]);
     if (matchError || dayError) return {};
     const summary = {};
     (dayScores || []).forEach((row) => {
-      summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0 };
+      summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0, matchWins: 0, matchdayWins: 0 };
       summary[row.team_id].base += Number(row.weighted_points || 0);
       summary[row.team_id].matchdayBonus += Number(row.bonus_points || 0);
+      if (Number(row.bonus_points || 0) > 0) summary[row.team_id].matchdayWins += 1;
     });
     (matchScores || []).forEach((row) => {
-      summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0 };
+      summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0, matchWins: 0, matchdayWins: 0 };
       summary[row.team_id].matchBonus += Number(row.match_bonus || 0);
+      if (Number(row.match_bonus || 0) > 0) summary[row.team_id].matchWins += 1;
     });
     return summary;
   }
@@ -354,6 +356,20 @@
     return footballRequest("events", { fixture });
   }
 
+  function activeBotIds(teams) {
+    const seenNames = new Set();
+    return new Set((teams || []).flatMap((team) =>
+      (team.members || []).filter((member) => {
+        if (!member.bot) return false;
+        const name = String(member.name || "").toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        if (!name || seenNames.has(name)) return false;
+        seenNames.add(name);
+        return true;
+      }).map((member) => String(member.id))
+    ));
+  }
+
   async function loadStandings() {
     if (!league) return [];
     const { data: allProfiles } = await client.from("participant_profiles")
@@ -364,6 +380,9 @@
       .select("profile_id, goal_points, win_points").eq("league_id", league.id);
     const { data: botPoints } = await client.from("bot_predictions")
       .select("bot_id, bot_name, points").eq("league_id", league.id);
+    const { data: state } = await client.from("league_state")
+      .select("teams").eq("league_id", league.id).maybeSingle();
+    const configuredBotIds = activeBotIds(state?.teams);
     const humans = (allProfiles || []).map((profile) => ({
       ...profile,
       tipPoints: (tipPoints || []).filter((row) => row.profile_id === profile.id)
@@ -371,7 +390,10 @@
       fantasyPoints: (fantasyPoints || []).filter((row) => row.profile_id === profile.id)
         .reduce((sum, row) => sum + Number(row.goal_points || 0) + Number(row.win_points || 0), 0)
     }));
-    const bots = Object.values((botPoints || []).reduce((result, row) => {
+    const activeBotPoints = configuredBotIds.size
+      ? (botPoints || []).filter((row) => configuredBotIds.has(String(row.bot_id)))
+      : (botPoints || []);
+    const bots = Object.values(activeBotPoints.reduce((result, row) => {
       result[row.bot_id] ||= {
         id: row.bot_id, display_name: row.bot_name, tipPoints: 0, fantasyPoints: 0
       };
@@ -410,11 +432,15 @@
     const firstError = profileError || tipError || fantasyError || botError
       || scheduleError || teamMatchError || teamDayError;
     if (firstError) throw firstError;
+    const state = await loadState();
+    const configuredBotIds = activeBotIds(state?.teams);
     return {
       profiles: profiles || [],
       profileTips: profileTips || [],
       fantasy: fantasy || [],
-      bots: bots || [],
+      bots: configuredBotIds.size
+        ? (bots || []).filter((row) => configuredBotIds.has(String(row.bot_id)))
+        : (bots || []),
       schedule: schedule || [],
       teamMatches: teamMatches || [],
       teamDays: teamDays || []
