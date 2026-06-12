@@ -106,6 +106,14 @@
     return Number(data || 0);
   }
 
+  async function syncCurrentParticipantRole() {
+    if (!league || !session) return null;
+    const { data, error } = await client.rpc("sync_current_participant_role");
+    if (error) throw error;
+    await loadMembership();
+    return data;
+  }
+
   async function addFamilyProfile(displayName) {
     const { error } = await client.rpc("add_family_profile", {
       profile_name: displayName,
@@ -570,7 +578,7 @@
   window.TippRadarCloud = {
     init, sendMagicLink, claimParticipantInvite, refreshSessionContext,
     loadParticipantInvites, inviteParticipant, signOut, createLeague, joinLeague, ensurePrimaryProfile,
-    loadProfiles, selectProfile, setManageableProfileIds, syncTeamParticipantProfiles,
+    loadProfiles, selectProfile, setManageableProfileIds, syncCurrentParticipantRole, syncTeamParticipantProfiles,
     addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
     loadState, saveState, setScoringStart, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
     loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadScorerTotals, loadStandings,

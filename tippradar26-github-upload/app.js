@@ -2599,6 +2599,11 @@ async function syncFromCloud() {
     localStorage.setItem(teamStorageKey, JSON.stringify(teams));
     localStorage.setItem(ruleStorageKey, JSON.stringify(scoringRules));
   }
+  try {
+    await cloud.syncCurrentParticipantRole();
+  } catch (error) {
+    console.warn("Teilnehmerrolle konnte nicht abgeglichen werden:", error);
+  }
   const ownPrimaryProfile = cloud.profiles.find((profile) =>
     profile.account_user_id === cloud.session?.user?.id && profile.is_primary
   );

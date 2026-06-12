@@ -25,6 +25,10 @@ Zugang uebernommen werden. Der Team-Lead kann bei Erwachsenen und Jugendlichen
 nur noch leere Tipps erfassen. Bereits gespeicherte Tipps koennen ausschliesslich
 vom jeweiligen eigenen Zugang geaendert werden.
 
+Die in `Teams & Spieler` hinterlegte Rolle wird beim Laden automatisch mit dem
+angemeldeten Konto abgeglichen. Ein dort als Team-Lead gefuehrter Teilnehmer
+wird dadurch automatisch als Family-Team-Lead erkannt.
+
 Mit der letzten Migration kann der Organisator unter `Teams & Spieler` fuer
 Team-Leads, Erwachsene und Jugendliche eine E-Mail-Adresse hinterlegen und
 direkt einen persoenlichen Anmeldelink senden. Nach dem Klick wird der Zugang

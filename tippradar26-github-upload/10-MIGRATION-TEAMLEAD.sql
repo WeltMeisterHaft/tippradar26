@@ -3,6 +3,81 @@
 alter table public.participant_profiles
   alter column account_user_id drop not null;
 
+create or replace function public.sync_current_participant_role()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_league uuid;
+  member_name text;
+  prepared_role text;
+  primary_profile uuid;
+begin
+  select league_id, display_name
+  into target_league, member_name
+  from public.league_members
+  where user_id = auth.uid()
+  limit 1;
+
+  if target_league is null then
+    return null;
+  end if;
+
+  select coalesce(member->>'role', 'adult')
+  into prepared_role
+  from public.league_state state
+  cross join lateral jsonb_array_elements(state.teams) team
+  cross join lateral jsonb_array_elements(team->'members') member
+  where state.league_id = target_league
+    and lower(trim(member->>'name')) = lower(trim(member_name))
+    and not coalesce((member->>'bot')::boolean, false)
+  limit 1;
+
+  if prepared_role not in ('lead', 'adult', 'youth') then
+    return null;
+  end if;
+
+  update public.league_members
+  set account_type = case when prepared_role = 'lead' then 'family' else 'single' end
+  where league_id = target_league
+    and user_id = auth.uid();
+
+  select id
+  into primary_profile
+  from public.participant_profiles
+  where league_id = target_league
+    and account_user_id = auth.uid()
+    and is_primary
+  limit 1;
+
+  if primary_profile is not null then
+    update public.participant_profiles
+    set profile_type = prepared_role
+    where id = primary_profile;
+  else
+    select id
+    into primary_profile
+    from public.participant_profiles
+    where league_id = target_league
+      and lower(trim(display_name)) = lower(trim(member_name))
+      and account_user_id is null
+    limit 1;
+
+    if primary_profile is not null then
+      update public.participant_profiles
+      set account_user_id = auth.uid(),
+          profile_type = prepared_role,
+          is_primary = true
+      where id = primary_profile;
+    end if;
+  end if;
+
+  return prepared_role;
+end
+$$;
+
 create or replace function public.sync_team_participant_profiles()
 returns integer
 language plpgsql
@@ -273,5 +348,6 @@ with check (public.can_manage_participant_profile(profile_id));
 grant execute on function public.can_team_lead_manage_profile(uuid) to authenticated;
 grant execute on function public.can_manage_participant_profile(uuid) to authenticated;
 grant execute on function public.can_directly_manage_participant_profile(uuid) to authenticated;
+grant execute on function public.sync_current_participant_role() to authenticated;
 grant execute on function public.sync_team_participant_profiles() to authenticated;
 grant execute on function public.save_profile_predictions(uuid, jsonb) to authenticated;
