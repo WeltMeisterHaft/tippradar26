@@ -1067,7 +1067,10 @@ function renderPointDetails() {
                         <div class="ledger-detail-head"><span>Name</span><span>Tipp</span><span>Tipps</span><span>Top 5</span><span>Gesamt</span></div>
                         ${item.participantRows.length ? item.participantRows.map((row) => `
                           <details class="participant-score-detail">
-                            <summary><span><i></i>${escapeHtml(row.name)}</span><span>${row.tip}</span><span>${row.tipPoints}</span><span>${row.top5}</span><strong>${row.total}</strong></summary>
+                            <summary title="Punkte von ${escapeHtml(row.name)} erkl&auml;ren">
+                              <span><i></i><b>${escapeHtml(row.name)}</b><small>Punkte erkl&auml;ren</small></span>
+                              <span>${row.tip}</span><span>${row.tipPoints}</span><span>${row.top5}</span><strong>${row.total}</strong>
+                            </summary>
                             <div class="score-category-list">
                               <span class="score-result-note">Ergebnis ${escapeHtml(item.match.result || "\u2013")}</span>
                               ${row.categories.length ? row.categories.map((category) => `
