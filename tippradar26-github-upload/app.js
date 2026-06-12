@@ -57,6 +57,7 @@ const squadStorageKey = "tippradar26-squad-cache-v1";
 const internationalStatsStorageKey = "tippradar26-international-stats-v2";
 let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
+let selectedParticipant = "all";
 let teamScoreSummary = {};
 let leaguePredictions = {};
 let fantasyPicks = [];
@@ -229,10 +230,10 @@ async function loadOpenLigaMatches() {
     const response = await fetch("https://api.openligadb.de/getmatchdata/wm26/2026");
     if (!response.ok) throw new Error(`OpenLigaDB ${response.status}`);
     const data = await response.json();
-    const normalized = data
+    const normalized = assignGroupLetters(data
       .filter((match) => match.team1 && match.team2)
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
-      .map(normalizeOpenLigaMatch);
+      .map(normalizeOpenLigaMatch));
     if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
     tournamentSchedule = normalized;
     localStorage.setItem(scheduleStorageKey, JSON.stringify(normalized));
@@ -386,13 +387,135 @@ function updateProgress() {
 }
 
 function groupLetterForMatch(match) {
+  if (match.groupLetter) return match.groupLetter;
   const label = `${match.group || ""} ${match.matchday || ""}`;
-  const matchResult = label.match(/(?:gruppe|group)\s*([A-L])\b/i);
+  const matchResult = label.match(/(?:gruppe|group)\s*([A-L])\b/i)
+    || label.match(/^\s*([A-L])(?:\s|$)/i);
   return matchResult?.[1]?.toUpperCase() || null;
 }
 
+const worldCupGroupTeams = {
+  A: ["mexico", "mexiko", "south africa", "sudafrika", "south korea", "sudkorea", "czech republic", "czechia", "tschechien"],
+  B: ["canada", "kanada", "bosnia and herzegovina", "bosnien-herzegowina", "qatar", "katar", "switzerland", "schweiz"],
+  C: ["brazil", "brasilien", "morocco", "marokko", "haiti", "scotland", "schottland"],
+  D: ["united states", "usa", "paraguay", "australia", "australien", "turkey", "turkei"],
+  E: ["germany", "deutschland", "curacao", "ivory coast", "cote d'ivoire", "elfenbeinkuste", "ecuador"],
+  F: ["netherlands", "niederlande", "japan", "sweden", "schweden", "tunisia", "tunesien"],
+  G: ["belgium", "belgien", "egypt", "agypten", "iran", "new zealand", "neuseeland"],
+  H: ["spain", "spanien", "cape verde", "kap verde", "saudi arabia", "saudi-arabien", "uruguay"],
+  I: ["france", "frankreich", "senegal", "iraq", "irak", "norway", "norwegen"],
+  J: ["argentina", "argentinien", "algeria", "algerien", "austria", "osterreich", "jordan", "jordanien"],
+  K: ["portugal", "dr congo", "dr kongo", "uzbekistan", "usbekistan", "colombia", "kolumbien"],
+  L: ["england", "croatia", "kroatien", "ghana", "panama"]
+};
+const worldCupGroupByTeam = Object.fromEntries(Object.entries(worldCupGroupTeams)
+  .flatMap(([group, names]) => names.map((name) => [normalizedTeamName(name), group])));
+const worldCupGroupDisplay = {
+  A: ["Mexiko", "S\u00fcdafrika", "S\u00fdkorea", "Tschechien"],
+  B: ["Kanada", "Bosnien-Herzegowina", "Katar", "Schweiz"],
+  C: ["Brasilien", "Marokko", "Haiti", "Schottland"],
+  D: ["USA", "Paraguay", "Australien", "T\u00fcrkei"],
+  E: ["Deutschland", "Cura\u00e7ao", "Elfenbeink\u00fcste", "Ecuador"],
+  F: ["Niederlande", "Japan", "Schweden", "Tunesien"],
+  G: ["Belgien", "\u00c4gypten", "Iran", "Neuseeland"],
+  H: ["Spanien", "Kap Verde", "Saudi-Arabien", "Uruguay"],
+  I: ["Frankreich", "Senegal", "Irak", "Norwegen"],
+  J: ["Argentinien", "Algerien", "\u00d6sterreich", "Jordanien"],
+  K: ["Portugal", "DR Kongo", "Usbekistan", "Kolumbien"],
+  L: ["England", "Kroatien", "Ghana", "Panama"]
+};
+tournamentSchedule = assignGroupLetters(tournamentSchedule);
+
+function sameNationalTeam(first, second) {
+  return canonicalNationalTeam(first) === canonicalNationalTeam(second);
+}
+
+function officialSimulationMatches() {
+  return Object.entries(worldCupGroupDisplay).flatMap(([group, teams]) =>
+    teams.flatMap((home, homeIndex) =>
+      teams.slice(homeIndex + 1).map((away) => {
+        const liveMatch = tournamentSchedule.find((match) =>
+          (sameNationalTeam(match.home, home) && sameNationalTeam(match.away, away))
+          || (sameNationalTeam(match.home, away) && sameNationalTeam(match.away, home))
+        );
+        const reversed = liveMatch && sameNationalTeam(liveMatch.home, away);
+        const liveResult = liveMatch?.result?.split(":").map(Number);
+        const result = liveResult?.length === 2
+          ? `${reversed ? liveResult[1] : liveResult[0]}:${reversed ? liveResult[0] : liveResult[1]}`
+          : null;
+        return {
+          id: liveMatch?.id || `simulation-${group}-${homeIndex}-${teams.indexOf(away)}`,
+          group: `Gruppe ${group}`,
+          groupLetter: group,
+          home,
+          away,
+          result,
+          sourceMatch: liveMatch || null
+        };
+      })
+    )
+  );
+}
+
+function assignGroupLetters(schedule) {
+  const groupStage = schedule.filter((match) => {
+    const kickoff = new Date(match.kickoff).getTime();
+    return Number.isFinite(kickoff) && kickoff < new Date("2026-06-28T00:00:00Z").getTime();
+  });
+  const neighbors = {};
+  groupStage.forEach((match) => {
+    neighbors[match.home] ||= new Set();
+    neighbors[match.away] ||= new Set();
+    neighbors[match.home].add(match.away);
+    neighbors[match.away].add(match.home);
+  });
+  const components = [];
+  const visited = new Set();
+  Object.keys(neighbors).forEach((team) => {
+    if (visited.has(team)) return;
+    const component = [];
+    const queue = [team];
+    visited.add(team);
+    while (queue.length) {
+      const current = queue.shift();
+      component.push(current);
+      neighbors[current].forEach((opponent) => {
+        if (visited.has(opponent)) return;
+        visited.add(opponent);
+        queue.push(opponent);
+      });
+    }
+    if (component.length >= 2) {
+      const firstKickoff = Math.min(...groupStage
+        .filter((match) => component.includes(match.home) || component.includes(match.away))
+        .map((match) => new Date(match.kickoff).getTime()));
+      components.push({ teams: component, firstKickoff });
+    }
+  });
+  components.sort((a, b) => a.firstKickoff - b.firstKickoff);
+  const teamGroup = {};
+  components.slice(0, 12).forEach((component, index) => {
+    const letter = String.fromCharCode(65 + index);
+    component.teams.forEach((team) => { teamGroup[team] = letter; });
+  });
+  return schedule.map((match) => ({
+    ...match,
+    groupLetter: groupLetterForMatch(match)
+      || worldCupGroupByTeam[normalizedTeamName(match.home)]
+      || worldCupGroupByTeam[normalizedTeamName(match.away)]
+      || teamGroup[match.home]
+      || teamGroup[match.away]
+      || null
+  }));
+}
+
 function simulationTipForMatch(match, ownTips) {
-  if (simulationModel === "own") return ownTips[String(match.id)] || null;
+  if (simulationModel === "own") {
+    const directTip = ownTips[String(match.id)];
+    if (!directTip || !match.sourceMatch) return directTip || null;
+    const reversed = sameNationalTeam(match.sourceMatch.home, match.away);
+    return reversed ? { home: directTip.away, away: directTip.home } : directTip;
+  }
   const [home, away] = botTip({
     id: `simulation-${simulationModel}`,
     strategy: simulationModel
@@ -402,17 +525,17 @@ function simulationTipForMatch(match, ownTips) {
 
 function simulatedGroupStandings() {
   const ownTips = simulationModel === "own" ? collectTips() : {};
-  const groupMatches = tournamentSchedule.filter((match) => groupLetterForMatch(match));
-  const groups = {};
+  const groupMatches = officialSimulationMatches();
+  const groups = Object.fromEntries(Object.entries(worldCupGroupDisplay).map(([group, teams]) => [
+    group,
+    Object.fromEntries(teams.map((team) => [
+      team,
+      { team, group, played: 0, points: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0 }
+    ]))
+  ]));
   let predicted = 0;
   groupMatches.forEach((match) => {
-    const group = groupLetterForMatch(match);
-    groups[group] ||= {};
-    [match.home, match.away].forEach((team) => {
-      groups[group][team] ||= {
-        team, group, played: 0, points: 0, goalsFor: 0, goalsAgainst: 0, goalDifference: 0
-      };
-    });
+    const group = match.groupLetter;
     const simulatedTip = simulationTipForMatch(match, ownTips);
     const score = match.result
       ? match.result.split(":").map(Number)
@@ -480,6 +603,54 @@ function projectedThirdAssignments(thirds) {
   return assignment;
 }
 
+function simulateKnockoutMatch(home, away, matchId) {
+  const strategy = simulationModel === "own" ? "stat" : simulationModel;
+  const [homeGoals, awayGoals] = botTip({ id: `knockout-${strategy}`, strategy }, {
+    id: `knockout-${matchId}-${home.team}-${away.team}`,
+    home: home.team,
+    away: away.team
+  }).split(":").map(Number);
+  let winner = homeGoals > awayGoals ? home : away;
+  let decidedBy = "";
+  if (homeGoals === awayGoals) {
+    if (strategy === "dog") {
+      winner = seededNumber(`${matchId}-${home.team}-${away.team}`) >= 0.5 ? home : away;
+      decidedBy = "n. E.";
+    } else {
+      winner = rankFor(home.team) <= rankFor(away.team) ? home : away;
+      decidedBy = "n. E.";
+    }
+  }
+  return { matchId, home, away, homeGoals, awayGoals, winner, decidedBy };
+}
+
+function simulateKnockoutRound(teams, startNumber) {
+  const matches = [];
+  for (let index = 0; index < teams.length; index += 2) {
+    matches.push(simulateKnockoutMatch(teams[index], teams[index + 1], startNumber + (index / 2)));
+  }
+  return matches;
+}
+
+function renderKnockoutRound(title, matches) {
+  return `
+    <section class="tournament-round">
+      <div class="tournament-round-title"><h3>${title}</h3><span>${matches.length} Spiel${matches.length === 1 ? "" : "e"}</span></div>
+      <div class="round-grid">${matches.map((match) => `
+        <article class="knockout-match">
+          <small>SPIEL ${match.matchId}</small>
+          <div class="knockout-team ${match.winner === match.home ? "winner" : ""}">
+            <span>${escapeHtml(match.home.team)}</span><em>${match.homeGoals}</em>
+          </div>
+          <div class="knockout-team ${match.winner === match.away ? "winner" : ""}">
+            <span>${escapeHtml(match.away.team)}</span><em>${match.awayGoals}${match.decidedBy && match.winner === match.away ? ` · ${match.decidedBy}` : ""}</em>
+          </div>
+          ${match.decidedBy && match.winner === match.home ? `<small>${escapeHtml(match.winner.team)} ${match.decidedBy}</small>` : ""}
+        </article>`).join("")}
+      </div>
+    </section>`;
+}
+
 function renderTournamentSimulation() {
   const groupContainer = document.querySelector("#simulation-groups");
   const bracketContainer = document.querySelector("#simulation-bracket");
@@ -496,7 +667,7 @@ function renderTournamentSimulation() {
   };
   const groupEntries = Object.entries(simulation.groups).sort(([a], [b]) => a.localeCompare(b));
   if (!groupEntries.length) {
-    status.textContent = "Die Gruppenspiele werden noch aus dem Spielplan geladen.";
+    status.textContent = "Die Simulation konnte nicht aufgebaut werden. Bitte die Seite neu laden.";
     groupContainer.innerHTML = "";
     bracketContainer.innerHTML = "";
     return;
@@ -543,14 +714,25 @@ function renderTournamentSimulation() {
     [87, first("K"), projectedThird(87, "DEIJL")],
     [88, second("D"), second("G")]
   ];
+  const roundOf32 = pairings.map(([number, home, away]) =>
+    simulateKnockoutMatch(home, away, number)
+  );
+  const roundOf16 = simulateKnockoutRound(roundOf32.map((match) => match.winner), 89);
+  const quarterFinals = simulateKnockoutRound(roundOf16.map((match) => match.winner), 97);
+  const semiFinals = simulateKnockoutRound(quarterFinals.map((match) => match.winner), 101);
+  const final = simulateKnockoutRound(semiFinals.map((match) => match.winner), 104);
+  const champion = final[0].winner;
   bracketContainer.innerHTML = `
-    <h3>Projiziertes Sechzehntelfinale</h3>
-    <div class="round-grid">${pairings.map(([number, home, away]) => `
-      <article class="knockout-match">
-        <small>SPIEL ${number}</small>
-        <div class="knockout-team"><span>${escapeHtml(home?.team || "noch offen")}</span><em>${home?.group ? `${home === thirdAssignments[number] ? "3." : ""} ${home.group}` : ""}</em></div>
-        <div class="knockout-team"><span>${escapeHtml(away?.team || "noch offen")}</span><em>${away?.group ? `${away === thirdAssignments[number] ? "3. PROJ." : ""} ${away.group}` : ""}</em></div>
-      </article>`).join("")}</div>`;
+    ${renderKnockoutRound("Projiziertes Sechzehntelfinale", roundOf32)}
+    ${renderKnockoutRound("Achtelfinale", roundOf16)}
+    ${renderKnockoutRound("Viertelfinale", quarterFinals)}
+    ${renderKnockoutRound("Halbfinale", semiFinals)}
+    ${renderKnockoutRound("Finale", final)}
+    <div class="champion-card">
+      <small>PROGNOSTIZIERTER WELTMEISTER</small>
+      <strong>${escapeHtml(champion.team)}</strong>
+      <span>${modelNames[simulationModel]}</span>
+    </div>`;
   const missing = Math.max(0, simulation.total - simulation.predicted);
   status.textContent = simulationModel === "own" && missing
     ? `Grundlage: ${modelNames[simulationModel]}. ${simulation.predicted} von ${simulation.total} Gruppenspielen berücksichtigt. Noch ${missing} Gruppentipps fehlen.`
@@ -1192,9 +1374,11 @@ async function syncApiFootballEvents(schedule) {
 function renderScorerMatches() {
   const select = document.querySelector("#scorer-match");
   if (!select) return;
-  select.innerHTML = matches.map((match) =>
-    `<option value="${match.id}">${escapeHtml(match.home)} - ${escapeHtml(match.away)}${match.result ? ` (${match.result})` : ""}</option>`
-  ).join("");
+  select.innerHTML = matches.length
+    ? matches.map((match) =>
+      `<option value="${match.id}">${escapeHtml(match.home)} - ${escapeHtml(match.away)}${match.result ? ` (${match.result})` : ""}</option>`
+    ).join("")
+    : '<option value="">Spielplan wird geladen</option>';
 }
 
 function renderTipMatrix() {
@@ -1433,18 +1617,32 @@ function showView(name) {
 function renderRanking() {
   const body = document.querySelector("#ranking-body");
   if (!body) return;
+  const participantFilter = document.querySelector("#participant-filter");
   const pointsByName = Object.fromEntries(profileStandings.map((profile) => [
     profile.display_name, {
       total: Number(profile.tipPoints || 0) + Number(profile.fantasyPoints || 0),
       fantasy: Number(profile.fantasyPoints || 0)
     }
   ]));
-  const participants = currentParticipants().map((participant) => ({
+  const allParticipants = currentParticipants().map((participant) => ({
     ...participant, points: pointsByName[participant.name] || { total: 0, fantasy: 0 }
-  })).sort((a, b) => b.points.total - a.points.total);
+  })).sort((a, b) => b.points.total - a.points.total)
+    .map((participant, index) => ({ ...participant, overallRank: index + 1 }));
+  if (participantFilter) {
+    const availableIds = new Set(allParticipants.map((participant) => String(participant.id)));
+    if (selectedParticipant !== "all" && !availableIds.has(selectedParticipant)) selectedParticipant = "all";
+    participantFilter.innerHTML = `
+      <option value="all">Alle Teilnehmer</option>
+      ${allParticipants.map((participant) =>
+        `<option value="${escapeHtml(String(participant.id))}" ${String(participant.id) === selectedParticipant ? "selected" : ""}>${escapeHtml(participant.name)} · ${escapeHtml(participant.team)}</option>`
+      ).join("")}`;
+  }
+  const participants = selectedParticipant === "all"
+    ? allParticipants
+    : allParticipants.filter((participant) => String(participant.id) === selectedParticipant);
   body.innerHTML = participants.length ? participants.map((participant, index) => `
     <tr class="${participant.cooper ? "cooper-row" : ""}">
-      <td><b class="rank-number">${index + 1}</b></td>
+      <td><b class="rank-number">${participant.overallRank}</b></td>
       <td>
         <span class="mini-avatar ${participant.color}" style="--team-color:${participant.teamColor}">${participant.initials}</span>
         <strong>${escapeHtml(participant.name)}</strong>
@@ -1687,6 +1885,10 @@ document.querySelectorAll("[data-range]").forEach((button) => button.addEventLis
   button.classList.add("active");
   renderRankChart(button.dataset.range);
 }));
+document.querySelector("#participant-filter").addEventListener("change", (event) => {
+  selectedParticipant = event.target.value;
+  renderRanking();
+});
 
 document.querySelector("#save-tips").addEventListener("click", async () => {
   savedTips = collectTips();

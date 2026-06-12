@@ -401,6 +401,14 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .knockout-team { display: flex; justify-content: space-between; gap: 7px; padding-top: 8px; font-size: 10px; font-weight: 800; }
 .knockout-team + .knockout-team { margin-top: 7px; border-top: 1px solid rgba(255,255,255,.12); }
 .knockout-team em { color: var(--lime); font-size: 8px; font-style: normal; }
+.tournament-round + .tournament-round { margin-top: 20px; }
+.tournament-round-title { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tournament-round-title span { color: var(--muted); font-size: 9px; }
+.knockout-team.winner span { color: var(--lime); }
+.champion-card { display: grid; place-items: center; gap: 7px; margin-top: 20px; padding: 24px; border-radius: 18px; color: white; background: linear-gradient(120deg, #0b2117, #294638); text-align: center; }
+.champion-card small { color: var(--lime); font-size: 9px; font-weight: 800; letter-spacing: .14em; }
+.champion-card strong { font: 800 27px "Manrope"; }
+.champion-card span { color: #c7d0ca; font-size: 10px; }
 .simulation-note { margin: 15px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .match-card {
   background: var(--paper);
@@ -438,8 +446,9 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .save-panel .primary-button { margin: 0; }
 
 .ranking-intro { display: flex; justify-content: space-between; align-items: end; }
-.league-select { padding: 11px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; font-weight: 700; }
-.league-select span { margin-left: 20px; color: var(--muted); }
+.league-select { display: grid; gap: 4px; padding: 8px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.league-select span { color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.league-select select { min-width: 190px; border: 0; outline: 0; color: var(--ink); background: transparent; font: 700 13px "Manrope"; }
 .podium {
   min-height: 270px; margin-top: 28px; border-radius: 22px; background: var(--ink); color: white;
   display: flex; align-items: end; justify-content: center; gap: 12px; padding: 45px 20px 0; overflow: hidden;

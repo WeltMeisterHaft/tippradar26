@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260612-1548">
+  <link rel="stylesheet" href="styles.css?v=20260612-1700">
 </head>
 <body>
   <div class="app-shell">
@@ -132,7 +132,7 @@
           <div class="simulation-status" id="simulation-status"></div>
           <div class="simulation-groups" id="simulation-groups"></div>
           <div class="simulation-bracket" id="simulation-bracket"></div>
-          <p class="simulation-note">Vorschau nach Punkten, Tordifferenz und erzielten Toren. Direkter Vergleich, Fair-Play-Wertung und Losentscheid sind nicht simuliert. Die konkrete Zuordnung der acht besten Gruppendritten ist bis zur endgültigen Kombination eine gekennzeichnete Projektion.</p>
+          <p class="simulation-note">Vorschau nach Punkten, Tordifferenz und erzielten Toren. Direkter Vergleich und Fair-Play-Wertung sind nicht simuliert. Bei Remis entscheidet RANK/STAT nach Ranglistenst&auml;rke, DOG per stabilem Zufallsentscheid. Die Zuordnung der acht besten Gruppendritten bleibt eine Projektion.</p>
         </section>
         <section class="fantasy-card">
           <div class="fantasy-heading">
@@ -153,7 +153,12 @@
       <section class="view" id="ranking-view">
         <div class="page-intro ranking-intro">
           <div><span class="section-kicker">Unsere Runde</span><h1>Wer hat den besten Riecher?</h1><p>Die aktuelle Tabelle und alle kleinen Aufholjagden.</p></div>
-          <div class="league-select">Alle Teilnehmer <span>&#8964;</span></div>
+          <label class="league-select" for="participant-filter">
+            <span>Anzeige</span>
+            <select id="participant-filter">
+              <option value="all">Alle Teilnehmer</option>
+            </select>
+          </label>
         </div>
 
         <section class="chart-card">
@@ -306,7 +311,7 @@
         </section>
       </section>
     </main>
-    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.12-1548</span></footer>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.12-1700</span></footer>
 
     <nav class="mobile-nav" aria-label="Mobile Navigation">
       <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
@@ -350,7 +355,7 @@
           <a class="tutorial-link" href="/tutorial/" target="_blank" rel="noopener">Kurzanleitung &ouml;ffnen</a>
           <div class="profile-switcher">
             <label><span>Kontoart</span><select id="current-account-type"><option value="single">Single</option><option value="family">Family</option></select></label>
-            <label><span>Wer tippt gerade?</span><select id="active-profile"></select></label>
+            <label><span>Wer tippt gerade?</span><select id="active-profile"><option value="">Profile werden geladen</option></select></label>
             <label id="profile-auto-field"><span>Tippmodus dieses Profils</span><select id="profile-auto-strategy"><option value="manual">Manuell</option><option value="dog">DOG / Zufall</option><option value="rank">RANK / FIFA-Rangliste</option><option value="stat">STAT / Rangliste + Tormodell</option></select></label>
             <p class="profile-auto-note">Eine Auto-Variante ersetzt die Tipps aller noch offenen Spiele. Bereits angepfiffene Spiele bleiben unver&auml;ndert.</p>
             <div id="family-profile-creator" hidden>
@@ -365,8 +370,8 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260612-1548"></script>
-  <script src="cloud.js?v=20260612-1548"></script>
-  <script src="app.js?v=20260612-1548"></script>
+  <script src="config.js?v=20260612-1700"></script>
+  <script src="cloud.js?v=20260612-1700"></script>
+  <script src="app.js?v=20260612-1700"></script>
 </body>
 </html>
