@@ -321,7 +321,7 @@ function renderMatches() {
         <div class="match-insights">
           <div class="cooper-pick">
             <span class="cooper-badge">A</span>
-            <span><small>Auto-Tipper</small><strong>DOG / RANK / STAT</strong></span>
+            <span><small>Prognosemodelle</small><strong>DOG / RANK / STAT / DNA</strong></span>
             <span class="confidence">${open ? "Tipps bis Anpfiff geheim" : "Tipps sichtbar"}</span>
           </div>
         </div>
@@ -329,6 +329,7 @@ function renderMatches() {
           <span><small>DOG</small><b>Zufall</b></span>
           <span><small>RANK</small><b>FIFA-Rang</b></span>
           <span><small>STAT</small><b>Tormodell</b></span>
+          <span><small>DNA</small><b>WM-Erfahrung</b></span>
         </div>
         ${!counted
           ? '<div class="locked-label excluded-label">Au&szlig;er Wertung</div>'
