@@ -109,6 +109,46 @@ module.exports = async function handler(request, response) {
   const action = String(request.query.action || "probe");
 
   try {
+    if (action === "public-squad") {
+      const requestedName = String(request.query.team || "").trim();
+      if (!requestedName) {
+        send(response, 400, { ok: false, error: "Nationalmannschaft wird benoetigt." });
+        return;
+      }
+      const searchName = teamAliases[plain(requestedName)] || requestedName;
+      const page = "2026 FIFA World Cup squads";
+      const sectionsResponse = await fetch(
+        `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(page)}&prop=sections&format=json&formatversion=2`
+      );
+      if (!sectionsResponse.ok) throw new Error(`Wikipedia antwortet mit ${sectionsResponse.status}`);
+      const sectionsBody = await sectionsResponse.json();
+      const section = (sectionsBody?.parse?.sections || []).find((item) =>
+        String(item.level) === "3" && plain(item.line) === plain(searchName)
+      );
+      if (!section) {
+        send(response, 404, { ok: false, error: `Oeffentlicher WM-Kader fuer ${requestedName} nicht gefunden.` });
+        return;
+      }
+      const squadResponse = await fetch(
+        `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(page)}&section=${section.index}&prop=text&format=json&formatversion=2`
+      );
+      if (!squadResponse.ok) throw new Error(`Wikipedia antwortet mit ${squadResponse.status}`);
+      const squadBody = await squadResponse.json();
+      const html = squadBody?.parse?.text || "";
+      if (!html) {
+        send(response, 502, { ok: false, error: `Oeffentlicher WM-Kader fuer ${requestedName} ist leer.` });
+        return;
+      }
+      send(response, 200, {
+        ok: true,
+        requestedName,
+        team: searchName,
+        source: "wikipedia",
+        html
+      }, 86400);
+      return;
+    }
+
     if (action === "probe") {
       const today = berlinDate();
       const [status, fixtures] = await Promise.all([

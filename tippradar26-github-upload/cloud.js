@@ -376,6 +376,10 @@
     return footballRequest("team-squad", { team });
   }
 
+  function loadPublicSquad(team) {
+    return footballRequest("public-squad", { team });
+  }
+
   function loadFootballEvents(fixture) {
     return footballRequest("events", { fixture });
   }
@@ -503,7 +507,7 @@
     loadProfiles, selectProfile, addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
     loadState, saveState, setScoringStart, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
     loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadScorerTotals, loadStandings,
-    loadFootballDay, loadTeamSquad, loadFootballEvents,
+    loadFootballDay, loadTeamSquad, loadPublicSquad, loadFootballEvents,
     loadTeamScores, loadPointDetails, syncSchedule, scoreMatch,
     get configured() { return configured; },
     get session() { return session; },

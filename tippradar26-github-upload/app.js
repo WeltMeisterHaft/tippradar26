@@ -70,7 +70,7 @@ function ensureTeamBonusRules() {
 
 const storageKey = "tippradar26-tips";
 const squadStorageKey = "tippradar26-squad-cache-v1";
-const internationalStatsStorageKey = "tippradar26-international-stats-v1";
+const internationalStatsStorageKey = "tippradar26-international-stats-v2";
 let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
 let teamScoreSummary = {};
@@ -88,6 +88,7 @@ let internationalStats = (() => {
   }
 })();
 let internationalStatsIndex = {};
+let internationalStatsPromise = null;
 let tournamentSchedule = [...demoMatches];
 let tournamentTeams = [...new Set(demoMatches.flatMap((match) => [match.home, match.away]))]
   .sort((a, b) => a.localeCompare(b, "de"));
@@ -377,12 +378,34 @@ function normalizedPlayerName(name) {
 function canonicalNationalTeam(name) {
   const normalized = normalizedTeamName(name);
   return ({
+    "argentinien": "argentina",
+    "australien": "australia",
+    "belgien": "belgium",
+    "brasilien": "brazil",
+    "danemark": "denmark",
+    "frankreich": "france",
+    "jordanien": "jordan",
+    "kanada": "canada",
+    "katar": "qatar",
+    "kolumbien": "colombia",
+    "kroatien": "croatia",
+    "marokko": "morocco",
     "mexiko": "mexico",
     "sudafrika": "south africa",
     "sudkorea": "south korea",
     "tschechien": "czech republic",
     "deutschland": "germany",
     "niederlande": "netherlands",
+    "neuseeland": "new zealand",
+    "norwegen": "norway",
+    "osterreich": "austria",
+    "schottland": "scotland",
+    "schweden": "sweden",
+    "schweiz": "switzerland",
+    "spanien": "spain",
+    "tunesien": "tunisia",
+    "turkei": "turkey",
+    "usbekistan": "uzbekistan",
     "elfenbeinkuste": "ivory coast",
     "vereinigte staaten": "united states",
     "usa": "united states",
@@ -397,6 +420,116 @@ function playerShortKey(name) {
   const parts = normalizedPlayerName(name).split(" ").filter(Boolean);
   if (parts.length < 2) return "";
   return `${parts[0][0]}:${parts.at(-1)}`;
+}
+
+function publicPlayerId(team, name) {
+  const key = `${canonicalNationalTeam(team)}|${normalizedPlayerName(name)}`;
+  let hash = 2166136261;
+  for (const character of key) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `wiki-${hash >>> 0}`;
+}
+
+function wikipediaPosition(value) {
+  const position = String(value || "").toUpperCase();
+  if (position.includes("GK")) return "Goalkeeper";
+  if (position.includes("DF")) return "Defender";
+  if (position.includes("MF")) return "Midfielder";
+  if (position.includes("FW")) return "Attacker";
+  return "Midfielder";
+}
+
+function publicSquadForTeam(teamName) {
+  const team = canonicalNationalTeam(teamName);
+  const players = internationalStats
+    .filter((stat) => canonicalNationalTeam(stat.team) === team)
+    .map((stat) => ({
+      id: publicPlayerId(stat.team, stat.name),
+      name: stat.name,
+      position: stat.position,
+      number: stat.number,
+      team: stat.team,
+      source: "wikipedia"
+    }))
+    .sort((a, b) => (a.number || 99) - (b.number || 99) || a.name.localeCompare(b.name));
+  return players.length ? {
+    team: teamName,
+    teamId: null,
+    players,
+    source: "wikipedia",
+    cachedAt: new Date().toISOString()
+  } : null;
+}
+
+function populatePublicSquadCache() {
+  const teamNames = new Set([
+    ...tournamentTeams,
+    ...fantasyPicks.map((pick) => pick.national_team).filter(Boolean)
+  ]);
+  let changed = false;
+  teamNames.forEach((teamName) => {
+    const cacheKey = normalizedTeamName(teamName);
+    if (squadCache[cacheKey]?.players?.length) return;
+    const publicSquad = publicSquadForTeam(teamName);
+    if (!publicSquad) return;
+    squadCache[cacheKey] = publicSquad;
+    changed = true;
+  });
+  if (changed) localStorage.setItem(squadStorageKey, JSON.stringify(squadCache));
+}
+
+function parsePublicSquadHtml(teamName, html) {
+  const documentCopy = new DOMParser().parseFromString(html || "", "text/html");
+  const table = documentCopy.querySelector("table.wikitable");
+  if (!table) return [];
+  const headers = [...table.querySelectorAll("tr:first-child th")]
+    .map((cell) => normalizedPlayerName(cell.textContent));
+  const playerIndex = headers.findIndex((header) => header === "player");
+  const numberIndex = headers.findIndex((header) => header === "no");
+  const positionIndex = headers.findIndex((header) => header === "pos");
+  const capsIndex = headers.findIndex((header) => header === "caps");
+  const goalsIndex = headers.findIndex((header) => header === "goals");
+  if (playerIndex < 0 || capsIndex < 0 || goalsIndex < 0) return [];
+  return [...table.querySelectorAll("tr")].slice(1).map((row) => {
+    const cells = [...row.querySelectorAll(":scope > th, :scope > td")];
+    const name = cells[playerIndex]?.textContent
+      .replace(/\[[^\]]*\]/g, "")
+      .replace(/\s*\(captain\)\s*/gi, " ")
+      .trim();
+    const caps = Number.parseInt(cells[capsIndex]?.textContent, 10);
+    const goals = Number.parseInt(cells[goalsIndex]?.textContent, 10);
+    return name && Number.isFinite(caps) && Number.isFinite(goals) ? {
+      name,
+      team: teamName,
+      number: Number.parseInt(cells[numberIndex]?.textContent, 10) || null,
+      position: wikipediaPosition(cells[positionIndex]?.textContent),
+      caps,
+      goals
+    } : null;
+  }).filter(Boolean);
+}
+
+function mergeInternationalStats(records) {
+  const merged = new Map(internationalStats.map((stat) => [
+    `${canonicalNationalTeam(stat.team)}|${normalizedPlayerName(stat.name)}`,
+    stat
+  ]));
+  records.forEach((stat) => {
+    merged.set(`${canonicalNationalTeam(stat.team)}|${normalizedPlayerName(stat.name)}`, stat);
+  });
+  internationalStats = [...merged.values()];
+  localStorage.setItem(internationalStatsStorageKey, JSON.stringify(internationalStats));
+  rebuildInternationalStatsIndex();
+}
+
+async function loadPublicSquadFallback(teamName) {
+  const result = await window.TippRadarCloud?.loadPublicSquad?.(teamName);
+  const records = parsePublicSquadHtml(result?.team || teamName, result?.html);
+  if (!records.length) return null;
+  mergeInternationalStats(records);
+  return publicSquadForTeam(teamName);
 }
 
 function rebuildInternationalStatsIndex() {
@@ -429,8 +562,9 @@ function internationalStatForPlayer(player) {
 async function loadInternationalStats() {
   rebuildInternationalStatsIndex();
   if (internationalStats.length) {
+    populatePublicSquadCache();
     renderFantasyPicks();
-    return;
+    return internationalStats;
   }
   try {
     const url = "https://en.wikipedia.org/w/api.php?action=parse&page=2026_FIFA_World_Cup_squads&prop=text&format=json&formatversion=2&origin=*";
@@ -449,6 +583,8 @@ async function loadInternationalStats() {
       const headers = [...element.querySelectorAll("tr:first-child th")]
         .map((cell) => normalizedPlayerName(cell.textContent));
       const playerIndex = headers.findIndex((header) => header === "player");
+      const numberIndex = headers.findIndex((header) => header === "no");
+      const positionIndex = headers.findIndex((header) => header === "pos");
       const capsIndex = headers.findIndex((header) => header === "caps");
       const goalsIndex = headers.findIndex((header) => header === "goals");
       if (!currentTeam || playerIndex < 0 || capsIndex < 0 || goalsIndex < 0) return;
@@ -461,7 +597,14 @@ async function loadInternationalStats() {
         const caps = Number.parseInt(cells[capsIndex]?.textContent, 10);
         const goals = Number.parseInt(cells[goalsIndex]?.textContent, 10);
         if (name && Number.isFinite(caps) && Number.isFinite(goals)) {
-          records.push({ name, team: currentTeam, caps, goals });
+          records.push({
+            name,
+            team: currentTeam,
+            number: Number.parseInt(cells[numberIndex]?.textContent, 10) || null,
+            position: wikipediaPosition(cells[positionIndex]?.textContent),
+            caps,
+            goals
+          });
         }
       });
     });
@@ -469,10 +612,18 @@ async function loadInternationalStats() {
     internationalStats = records;
     localStorage.setItem(internationalStatsStorageKey, JSON.stringify(records));
     rebuildInternationalStatsIndex();
+    populatePublicSquadCache();
     renderFantasyPicks();
+    return records;
   } catch (error) {
     console.warn("Länderspielstatistik konnte nicht aktualisiert werden:", error);
+    return [];
   }
+}
+
+function ensureInternationalStats() {
+  internationalStatsPromise ||= loadInternationalStats();
+  return internationalStatsPromise;
 }
 
 function rankFor(teamName) {
@@ -629,8 +780,10 @@ function positionLabel(position) {
 
 function playerOptionLabel(player) {
   const number = player.number ? ` #${player.number}` : "";
-  const scorerKey = player.id ? `id:${player.id}` : `name:${normalizedTeamName(player.name)}`;
-  const worldCupGoals = Number(scorerTotals[scorerKey] || 0);
+  const idGoals = player.id && !String(player.id).startsWith("wiki-")
+    ? scorerTotals[`id:${player.id}`]
+    : null;
+  const worldCupGoals = Number(idGoals || scorerTotals[`name:${normalizedTeamName(player.name)}`] || 0);
   const international = internationalStatForPlayer(player);
   const internationalLabel = international
     ? ` \u00b7 ${international.goals} Tore / ${international.caps} LS \u00b7 ${(international.caps ? (international.goals / international.caps) * 10 : 0).toFixed(1).replace(".", ",")} je 10 LS`
@@ -657,13 +810,13 @@ function renderFantasyPicks() {
         ${teamOptions.map((team) => `<option value="${escapeHtml(team)}" ${team === pick.national_team ? "selected" : ""}>${escapeHtml(team)}</option>`).join("")}
       </select>
       <select data-fantasy-player="${slot}" ${pick.national_team ? "" : "disabled"}>
-        <option value="">${pick.national_team ? (cached ? "Spieler w\u00e4hlen" : "Kader wird geladen") : "Zuerst Mannschaft w\u00e4hlen"}</option>
+        <option value="">${pick.national_team ? (cached?.players?.length ? "Spieler w\u00e4hlen" : "Kader wird geladen") : "Zuerst Mannschaft w\u00e4hlen"}</option>
         ${playerOptions.map((player) => `<option value="${player.id}" ${String(player.id) === String(pick.player_id) ? "selected" : ""}>${escapeHtml(playerOptionLabel(player))}</option>`).join("")}
       </select>
     </label>`;
   }).join("");
   document.querySelector("#fantasy-counter").textContent = `${fantasyPicks.length} / 5 gew\u00e4hlt`;
-  fantasyPicks.filter((pick) => pick.national_team && !squadCache[normalizedTeamName(pick.national_team)])
+  fantasyPicks.filter((pick) => pick.national_team && !squadCache[normalizedTeamName(pick.national_team)]?.players?.length)
     .forEach((pick) => loadSquadForSlot(pick.slot, pick.national_team, pick.player_id));
 }
 
@@ -672,13 +825,15 @@ function collectFantasyPicks() {
     const slot = index + 1;
     const playerSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
     const teamSelect = document.querySelector(`[data-fantasy-team="${slot}"]`);
-    const selectedPlayer = playerSelect.options[playerSelect.selectedIndex];
     const cached = squadCache[normalizedTeamName(teamSelect.value)];
+    const selectedPlayerData = cached?.players?.find((player) => String(player.id) === playerSelect.value);
     return {
       slot,
-      player_id: playerSelect.value ? Number(playerSelect.value) : null,
+      player_id: playerSelect.value && selectedPlayerData?.source !== "wikipedia"
+        ? Number(playerSelect.value)
+        : null,
       player_name: playerSelect.value
-        ? (cached?.players?.find((player) => String(player.id) === playerSelect.value)?.name || "")
+        ? (selectedPlayerData?.name || "")
         : "",
       api_team_id: cached?.teamId || null,
       national_team: teamSelect.value
@@ -695,9 +850,15 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
     playerSelect.innerHTML = '<option value="">Kader wird geladen</option>';
   }
   try {
-    if (!squadCache[cacheKey]) {
+    if (!squadCache[cacheKey]?.players?.length) {
       squadRequests[cacheKey] ||= window.TippRadarCloud.loadTeamSquad(teamName);
       squadCache[cacheKey] = await squadRequests[cacheKey];
+      if (!squadCache[cacheKey]?.players?.length) {
+        await ensureInternationalStats();
+        squadCache[cacheKey] = publicSquadForTeam(teamName)
+          || await loadPublicSquadFallback(teamName).catch(() => null)
+          || squadCache[cacheKey];
+      }
       squadCache[cacheKey].cachedAt = new Date().toISOString();
       localStorage.setItem(squadStorageKey, JSON.stringify(squadCache));
     }
@@ -710,6 +871,15 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
     ).join("")}`;
   } catch (error) {
     delete squadRequests[cacheKey];
+    await ensureInternationalStats();
+    if (!squadCache[cacheKey]?.players?.length) {
+      const publicSquad = publicSquadForTeam(teamName)
+        || await loadPublicSquadFallback(teamName).catch(() => null);
+      if (publicSquad) {
+        squadCache[cacheKey] = publicSquad;
+        localStorage.setItem(squadStorageKey, JSON.stringify(squadCache));
+      }
+    }
     const currentSelect = document.querySelector(`[data-fantasy-player="${slot}"]`);
     if (squadCache[cacheKey]?.players?.length) {
       if (currentSelect) {
@@ -718,7 +888,10 @@ async function loadSquadForSlot(slot, teamName, selectedPlayerId = null) {
           `<option value="${player.id}" ${String(player.id) === String(selectedPlayerId) ? "selected" : ""}>${escapeHtml(playerOptionLabel(player))}</option>`
         ).join("")}`;
       }
-      showToast("Letzten Kaderstand verwendet", `${teamName}: gespeicherte Version vom ${new Intl.DateTimeFormat("de-DE").format(new Date(squadCache[cacheKey].cachedAt || Date.now()))}.`);
+      const sourceText = squadCache[cacheKey].source === "wikipedia"
+        ? "öffentlicher WM-Kaderstand"
+        : `gespeicherte Version vom ${new Intl.DateTimeFormat("de-DE").format(new Date(squadCache[cacheKey].cachedAt || Date.now()))}`;
+      showToast("Kader geladen", `${teamName}: ${sourceText}.`);
       return;
     }
     if (currentSelect) currentSelect.innerHTML = '<option value="">Kader momentan nicht erreichbar</option>';
@@ -1890,7 +2063,7 @@ renderRanking();
 renderPointDetails();
 fantasyPicks = JSON.parse(localStorage.getItem(fantasyStorageKey()) || "[]");
 renderFantasyPicks();
-loadInternationalStats();
+ensureInternationalStats();
 renderScorerMatches();
 updateCountdown();
 loadOpenLigaMatches();
