@@ -2,20 +2,17 @@ const demoMatches = [
   {
     id: "mex-za", time: "Do / 21:00", group: "Gruppe A / Mexico City",
     kickoff: "2026-06-11T21:00:00+02:00", matchday: "1",
-    home: "Mexiko", away: "S\u00fcdafrika", homeFlag: "&#x1F1F2;&#x1F1FD;", awayFlag: "&#x1F1FF;&#x1F1E6;",
-    crowd: "2:0", crowdPercent: 68
+    home: "Mexiko", away: "S\u00fcdafrika", homeFlag: "&#x1F1F2;&#x1F1FD;", awayFlag: "&#x1F1FF;&#x1F1E6;"
   },
   {
     id: "kor-cze", time: "Fr / 03:00", group: "Gruppe A / Guadalajara",
     kickoff: "2026-06-12T03:00:00+02:00", matchday: "1",
-    home: "S\u00fcdkorea", away: "Tschechien", homeFlag: "&#x1F1F0;&#x1F1F7;", awayFlag: "&#x1F1E8;&#x1F1FF;",
-    crowd: "1:1", crowdPercent: 42
+    home: "S\u00fcdkorea", away: "Tschechien", homeFlag: "&#x1F1F0;&#x1F1F7;", awayFlag: "&#x1F1E8;&#x1F1FF;"
   },
   {
     id: "can-bih", time: "Fr / 21:00", group: "Gruppe B / Toronto",
     kickoff: "2026-06-12T21:00:00+02:00", matchday: "1",
-    home: "Kanada", away: "Bosnien-Herzegowina", homeFlag: "&#x1F1E8;&#x1F1E6;", awayFlag: "&#x1F1E7;&#x1F1E6;",
-    crowd: "2:1", crowdPercent: 57
+    home: "Kanada", away: "Bosnien-Herzegowina", homeFlag: "&#x1F1E8;&#x1F1E6;", awayFlag: "&#x1F1E7;&#x1F1E6;"
   }
 ];
 let matches = [...demoMatches];
@@ -80,6 +77,7 @@ let fantasyPicks = [];
 let profileStandings = [];
 let scoringStart = null;
 let pointDetails = null;
+let tournamentSchedule = [...demoMatches];
 let tournamentTeams = [...new Set(demoMatches.flatMap((match) => [match.home, match.away]))]
   .sort((a, b) => a.localeCompare(b, "de"));
 const squadCache = {};
@@ -102,7 +100,7 @@ function normalizeOpenLigaMatch(apiMatch, index) {
     id: String(apiMatch.matchID),
     kickoff: apiMatch.matchDateTimeUTC || apiMatch.matchDateTime,
     time: formatMatchTime(apiMatch.matchDateTime),
-    group: `${apiMatch.group?.groupName || "WM 2026"} / ${apiMatch.location?.locationCity || "Austragungsort offen"}`,
+    group: apiMatch.group?.groupName || "WM 2026",
     home: apiMatch.team1?.teamName || fallback.home,
     away: apiMatch.team2?.teamName || fallback.away,
     homeFlag: apiMatch.team1?.teamIconUrl ? `<img src="${apiMatch.team1.teamIconUrl}" alt="">` : fallback.homeFlag,
@@ -111,6 +109,83 @@ function normalizeOpenLigaMatch(apiMatch, index) {
     matchday: apiMatch.group?.groupOrderID || apiMatch.group?.groupName || "1",
     openLigaId: apiMatch.matchID
   };
+}
+
+function sameBerlinDay(value, reference = new Date()) {
+  return dateKey(value) === dateKey(reference);
+}
+
+function updateHomeHero(schedule) {
+  if (!schedule?.length) return;
+  const now = Date.now();
+  const upcoming = schedule.filter((match) => new Date(match.kickoff).getTime() > now);
+  const featured = upcoming[0] || [...schedule].reverse().find((match) => match.result) || schedule[0];
+  const kickoff = new Date(featured.kickoff);
+  const isUpcoming = kickoff.getTime() > now;
+  const isToday = sameBerlinDay(featured.kickoff);
+  const phase = featured.group || "WM 2026";
+  const timeLabel = new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    timeZone: "Europe/Berlin"
+  }).format(kickoff).replace(",", " \u00b7").toUpperCase();
+
+  document.querySelector("#hero-match-label").textContent = isUpcoming
+    ? (isToday ? "Heute" : "N\u00e4chstes Spiel")
+    : "Letztes Ergebnis";
+  document.querySelector("#hero-match-location").textContent = phase;
+  document.querySelector("#hero-home-flag").innerHTML = featured.homeFlag;
+  document.querySelector("#hero-away-flag").innerHTML = featured.awayFlag;
+  document.querySelector("#hero-home-name").textContent = featured.home;
+  document.querySelector("#hero-away-name").textContent = featured.away;
+  document.querySelector("#hero-kickoff").textContent = timeLabel;
+  document.querySelector("#hero-versus").textContent = featured.result || "VS";
+  document.querySelector("#hero-score-label").textContent = featured.result ? "Ergebnis" : "Status";
+  document.querySelector("#hero-score").textContent = featured.result || (isToday ? "Heute" : "Kommend");
+
+  const countdown = document.querySelector("#countdown");
+  if (isUpcoming) {
+    const diff = kickoff.getTime() - now;
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.max(1, Math.floor((diff % 3600000) / 60000));
+    countdown.textContent = hours >= 24
+      ? `${Math.floor(hours / 24)} Tag${Math.floor(hours / 24) === 1 ? "" : "e"}`
+      : `${hours ? `${hours} Std. ` : ""}${minutes} Min.`;
+    document.querySelector("#hero-status-copy").textContent =
+      `${isToday ? "Heute geht's weiter" : "N\u00e4chstes Spiel"} \u00b7 noch `;
+  } else {
+    countdown.textContent = "Turnier l\u00e4uft";
+    document.querySelector("#hero-status-copy").textContent = "WM 2026 \u00b7 ";
+  }
+  document.querySelector("#today-kicker").textContent = isToday ? "Heute in unserer Runde" : "Die n\u00e4chsten Spiele";
+  document.querySelector("#today-heading").textContent = isToday ? "Heute geht es weiter." : "Der n\u00e4chste Anpfiff kommt.";
+  document.querySelector("#today-tip-copy").textContent = isUpcoming
+    ? `Tipp f\u00fcr ${featured.home} gegen ${featured.away} rechtzeitig abgeben.`
+    : "Die n\u00e4chsten Spiele werden geladen.";
+}
+
+function updateDateTabs(schedule) {
+  const container = document.querySelector("#date-tabs");
+  if (!container || !schedule?.length) return;
+  const today = dateKey(new Date());
+  const grouped = Object.values(schedule.reduce((days, match) => {
+    const key = dateKey(match.kickoff);
+    days[key] ||= { key, date: new Date(match.kickoff), count: 0 };
+    days[key].count += 1;
+    return days;
+  }, {})).sort((a, b) => a.date - b.date);
+  const futureDays = grouped.filter((day) => day.key >= today);
+  const visibleDays = (futureDays.length ? futureDays : grouped.slice(-3)).slice(0, 3);
+  container.innerHTML = visibleDays.map((day, index) => {
+    const weekday = new Intl.DateTimeFormat("de-DE", {
+      weekday: "short", timeZone: "Europe/Berlin"
+    }).format(day.date).replace(".", "").toUpperCase();
+    const date = new Intl.DateTimeFormat("de-DE", {
+      day: "2-digit", month: "short", timeZone: "Europe/Berlin"
+    }).format(day.date).replace(".", "").toUpperCase();
+    return `<button class="date-tab ${index === 0 ? "active" : ""}">
+      <small>${weekday}</small><strong>${date}</strong><span>${day.count} Spiel${day.count === 1 ? "" : "e"}</span>
+    </button>`;
+  }).join("");
 }
 
 async function loadOpenLigaMatches() {
@@ -124,6 +199,9 @@ async function loadOpenLigaMatches() {
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
       .map(normalizeOpenLigaMatch);
     if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
+    tournamentSchedule = normalized;
+    updateHomeHero(normalized);
+    updateDateTabs(normalized);
     tournamentTeams = [...new Set(normalized.flatMap((match) => [match.home, match.away]))]
       .sort((a, b) => a.localeCompare(b, "de"));
     if (window.TippRadarCloud?.league?.role === "organizer") {
@@ -142,6 +220,7 @@ async function loadOpenLigaMatches() {
     renderMatches();
     renderTipMatrix();
     renderFantasyPicks();
+    renderPointDetails();
     if (window.TippRadarCloud?.league?.role === "organizer") {
       await syncApiFootballEvents(normalized);
       for (const match of normalized.filter((item) => item.result && isMatchCounted(item))) {
@@ -179,7 +258,6 @@ function renderMatches() {
           <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}" ${open && !automatic ? "" : "disabled"}>
         </div>
         <div class="match-insights">
-          <div class="community-note">Community: <strong>${match.crowd}</strong> / ${match.crowdPercent}% sehen ${match.home} vorn</div>
           <div class="cooper-pick">
             <span class="cooper-badge">A</span>
             <span><small>Auto-Tipper</small><strong>DOG / RANK / STAT</strong></span>
@@ -826,24 +904,44 @@ function renderPointDetails() {
   const startLabel = document.querySelector("#ledger-scoring-start");
   if (!list || !startLabel) return;
   startLabel.textContent = formatScoringStart(scoringStart);
-  if (!pointDetails?.schedule?.length) {
-    list.innerHTML = '<div class="ledger-empty">Noch keine ausgewerteten Spiele vorhanden.</div>';
-    return;
-  }
+  const details = pointDetails || {
+    profiles: [], profileTips: [], fantasy: [], bots: [],
+    schedule: [], teamMatches: [], teamDays: []
+  };
+  const liveById = Object.fromEntries(tournamentSchedule.map((match) => [String(match.id), match]));
+  const cloudScheduleAvailable = details.schedule.length > 0;
+  const schedule = (cloudScheduleAvailable ? details.schedule : tournamentSchedule.map((match) => ({
+    match_id: String(match.id), kickoff: match.kickoff, matchday: String(match.matchday),
+    home_team: match.home, away_team: match.away
+  }))).map((match) => ({
+    ...match,
+    result: liveById[String(match.match_id)]?.result || match.result || null
+  }));
 
-  const profileNames = Object.fromEntries(pointDetails.profiles.map((profile) => [profile.id, profile.display_name]));
-  const fantasyByKey = Object.fromEntries(pointDetails.fantasy.map((row) => [
+  const profileNames = Object.fromEntries(details.profiles.map((profile) => [profile.id, profile.display_name]));
+  const fantasyByKey = Object.fromEntries(details.fantasy.map((row) => [
     `${row.profile_id}:${row.match_id}`,
     Number(row.goal_points || 0) + Number(row.win_points || 0)
   ]));
   const teamNames = Object.fromEntries(teams.map((team) => [team.id, team.name]));
-  const rows = pointDetails.schedule
-    .filter((match) => new Date(match.kickoff).getTime() <= Date.now())
+  const evaluatedMatchIds = new Set([
+    ...details.profileTips.filter((row) => row.points !== null).map((row) => String(row.match_id)),
+    ...details.bots.filter((row) => row.points !== null).map((row) => String(row.match_id)),
+    ...details.teamMatches.map((row) => String(row.match_id))
+  ]);
+  const rows = schedule
+    .filter((match) => match.result || evaluatedMatchIds.has(String(match.match_id)))
     .sort((a, b) => new Date(b.kickoff) - new Date(a.kickoff));
+  if (!rows.length) {
+    list.innerHTML = `<div class="ledger-empty">${cloudScheduleAvailable
+      ? "Der Spielplan ist synchronisiert, aber es liegt noch kein ausgewertetes Ergebnis vor."
+      : "Der Spielplan wird noch synchronisiert. Bitte als Organisator auf Punkte aktualisieren klicken."}</div>`;
+    return;
+  }
 
   function matchBreakdown(match) {
     const counted = isMatchCounted(match);
-    const profileRows = pointDetails.profileTips
+    const profileRows = details.profileTips
       .filter((tip) => String(tip.match_id) === String(match.match_id))
       .map((tip) => {
         const tipPoints = counted ? Number(tip.points || 0) : 0;
@@ -854,7 +952,7 @@ function renderPointDetails() {
           tipPoints, top5, total: tipPoints + top5
         };
       });
-    const botRows = pointDetails.bots
+    const botRows = details.bots
       .filter((tip) => String(tip.match_id) === String(match.match_id))
       .map((tip) => ({
         name: `${tip.bot_name} (Auto)`, tip: `${tip.home_score}:${tip.away_score}`,
@@ -862,7 +960,7 @@ function renderPointDetails() {
         total: counted ? Number(tip.points || 0) : 0
       }));
     const participantRows = [...profileRows, ...botRows].sort((a, b) => b.total - a.total);
-    const teamRows = pointDetails.teamMatches
+    const teamRows = details.teamMatches
       .filter((row) => String(row.match_id) === String(match.match_id))
       .map((row) => ({
         name: teamNames[row.team_id] || row.team_id,
@@ -888,11 +986,12 @@ function renderPointDetails() {
   }, {})).sort((a, b) => b.latest - a.latest);
 
   list.innerHTML = matchesByDay.length ? `
+    ${cloudScheduleAvailable ? "" : '<div class="ledger-sync-note">Live-Spielplan geladen. Die zentrale Punkteauswertung wird noch synchronisiert.</div>'}
     <div class="ledger-table ledger-table-head" aria-hidden="true">
       <span>Spieltag / Spiel</span><span>TN-Tipps</span><span>TN Top 5</span><span>Team Top 5</span><span>Spielbonus</span><span>ST-Bonus</span>
     </div>
     ${matchesByDay.map((day, dayIndex) => {
-      const dayRows = pointDetails.teamDays
+      const dayRows = details.teamDays
         .filter((row) => String(row.matchday) === day.matchday)
         .map((row) => ({
           name: teamNames[row.team_id] || row.team_id,
@@ -1528,6 +1627,21 @@ document.querySelector("#ledger-expand-all").addEventListener("click", () => {
     row.open = true;
   });
 });
+document.querySelector("#ledger-refresh").addEventListener("click", async () => {
+  const button = document.querySelector("#ledger-refresh");
+  button.disabled = true;
+  button.textContent = "Wird aktualisiert";
+  try {
+    await loadOpenLigaMatches();
+    await syncFromCloud();
+    showToast("Punkte aktualisiert", "Spielplan und Wertung wurden neu geladen.");
+  } catch (error) {
+    showToast("Aktualisierung nicht vollständig", error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Punkte aktualisieren";
+  }
+});
 document.querySelector("#ledger-collapse-all").addEventListener("click", () => {
   document.querySelectorAll("#points-ledger-list details").forEach((row) => {
     row.open = false;
@@ -1544,13 +1658,8 @@ window.addEventListener("tippradar-auth-change", async () => {
 });
 
 function updateCountdown() {
-  const kickoff = new Date("2026-06-11T21:00:00+02:00");
-  const diff = kickoff - new Date();
-  const element = document.querySelector("#countdown");
-  if (diff <= 0) { element.textContent = "wenigen Momenten"; return; }
-  const days = Math.floor(diff / 86400000);
-  const hours = Math.floor((diff % 86400000) / 3600000);
-  element.textContent = days > 0 ? `${days} Tag${days === 1 ? "" : "en"}` : `${hours} Stunden`;
+  updateHomeHero(tournamentSchedule);
+  updateDateTabs(tournamentSchedule);
 }
 
 renderMatches();

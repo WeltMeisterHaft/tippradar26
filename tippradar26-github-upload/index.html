@@ -34,7 +34,7 @@
       <section class="view active" id="home-view">
         <div class="hero premium-hero">
           <div class="hero-copy">
-            <span class="eyebrow"><i></i> Bald geht's los &middot; noch <strong id="countdown">2 Tage</strong></span>
+            <span class="eyebrow" id="hero-status"><i></i><span id="hero-status-copy">WM 2026 &middot; </span><strong id="countdown">Spielplan wird geladen</strong></span>
             <h1>Unser Sommer.<br><span>Unsere Tipps.</span></h1>
             <p>Gemeinsam fiebern, tippen und staunen. Und zwischendurch fordern wir unsere drei Auto-Tipper heraus.</p>
             <button class="primary-button" data-go="tips">Meinen Tipp abgeben <span aria-hidden="true">&rarr;</span></button>
@@ -49,16 +49,16 @@
             <div class="stage-glow"></div>
             <div class="hero-card">
               <div class="card-topline">
-                <span class="live-badge">Er&ouml;ffnungsspiel</span>
-                <span>Donnerstagabend &middot; Mexico City</span>
+                <span class="live-badge" id="hero-match-label">N&auml;chstes Spiel</span>
+                <span id="hero-match-location">Spielplan wird geladen</span>
               </div>
               <div class="match-visual">
-                <div class="team-large"><span class="flag">&#x1F1F2;&#x1F1FD;</span><strong>Mexiko</strong></div>
-                <div class="kickoff"><small>11. JUN &middot; 21:00</small><span>VS</span></div>
-                <div class="team-large"><span class="flag">&#x1F1FF;&#x1F1E6;</span><strong>S&uuml;dafrika</strong></div>
+                <div class="team-large"><span class="flag" id="hero-home-flag">&#x26BD;</span><strong id="hero-home-name">Heimteam</strong></div>
+                <div class="kickoff"><small id="hero-kickoff">Termin offen</small><span id="hero-versus">VS</span></div>
+                <div class="team-large"><span class="flag" id="hero-away-flag">&#x26BD;</span><strong id="hero-away-name">Ausw&auml;rtsteam</strong></div>
               </div>
               <div class="prediction-split">
-                <div><span>Community</span><strong>2:0</strong></div>
+                <div><span id="hero-score-label">Status</span><strong id="hero-score">Offen</strong></div>
                 <i></i>
                 <div class="cooper-mini"><span>AUTO-TIPPER</span><strong>3 Modelle</strong></div>
               </div>
@@ -67,14 +67,14 @@
         </div>
 
         <div class="section-heading">
-          <div><span class="section-kicker">Heute in unserer Runde</span><h2>Bereit f&uuml;r den Anpfiff?</h2></div>
+          <div><span class="section-kicker" id="today-kicker">Heute in unserer Runde</span><h2 id="today-heading">Bereit f&uuml;r den Anpfiff?</h2></div>
           <span class="demo-label">6 Freunde &middot; 2 Teams</span>
         </div>
 
         <div class="dashboard-grid upgraded">
           <article class="dashboard-card tip-status">
             <div class="icon-box lime">&#10003;</div>
-            <div><span>Deine Tipps</span><h3>Noch alles offen</h3><p>Gib deine Tipps f&uuml;r den Auftakt ab.</p></div>
+            <div><span>Deine Tipps</span><h3>Noch alles offen</h3><p id="today-tip-copy">Gib deine Tipps f&uuml;r die n&auml;chsten Spiele ab.</p></div>
             <button class="text-button" data-go="tips">Tippen &rarr;</button>
           </article>
           <article class="dashboard-card form-card">
@@ -102,11 +102,7 @@
           <p>Einfach Ergebnis eintragen und mitfiebern. Gewertet wird der Spielstand nach 90 Minuten.</p>
           <div class="data-status"><i></i><span id="match-data-status">OpenLigaDB wird verbunden</span></div>
         </div>
-        <div class="date-tabs" role="tablist" aria-label="Spieltage">
-          <button class="date-tab active"><small>DO</small><strong>11. JUN</strong><span>1 Spiel</span></button>
-          <button class="date-tab"><small>FR</small><strong>12. JUN</strong><span>2 Spiele</span></button>
-          <button class="date-tab"><small>SA</small><strong>13. JUN</strong><span>4 Spiele</span></button>
-        </div>
+        <div class="date-tabs" id="date-tabs" role="tablist" aria-label="Spieltage"></div>
         <div class="model-info">
           <span class="cooper-dot">A</span>
           <div><strong>Drei kostenlose Auto-Tipper</strong><p>DOG nutzt Zufall, RANK den FIFA-Ranglistenstand und STAT zus&auml;tzlich ein mathematisches Tormodell.</p></div>
@@ -199,6 +195,7 @@
             <div><span class="section-kicker">Nachvollziehbare Wertung</span><h2>Punkte nach Spieltag</h2><p>Spieltag aufklappen, Einzelspiel ausw&auml;hlen und bis zu Teilnehmern und Teams heruntergehen.</p></div>
             <div class="ledger-head-actions">
               <span id="ledger-scoring-start">Wertungsstart wird geladen</span>
+              <button id="ledger-refresh" type="button">Punkte aktualisieren</button>
               <button id="ledger-expand-all" type="button">Alle &ouml;ffnen</button>
               <button id="ledger-collapse-all" type="button">Alle schlie&szlig;en</button>
             </div>
