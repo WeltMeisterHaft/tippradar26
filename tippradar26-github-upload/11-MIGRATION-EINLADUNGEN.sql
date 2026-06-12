@@ -26,6 +26,7 @@ declare
   prepared_role text;
   target_profile uuid;
   existing_owner uuid;
+  profile_is_primary boolean;
 begin
   select league_id
   into target_league
@@ -56,8 +57,8 @@ begin
     raise exception 'Nur Team-Leads, Erwachsene und Jugendliche erhalten einen eigenen Zugang';
   end if;
 
-  select id, account_user_id
-  into target_profile, existing_owner
+  select id, account_user_id, is_primary
+  into target_profile, existing_owner, profile_is_primary
   from public.participant_profiles
   where league_id = target_league
     and lower(trim(display_name)) = lower(trim(target_name))
@@ -72,7 +73,15 @@ begin
     )
     returning id into target_profile;
   elsif existing_owner is not null then
-    raise exception 'Dieses Teilnehmerprofil besitzt bereits einen aktiven Zugang';
+    if profile_is_primary then
+      raise exception 'Dieses Teilnehmerprofil besitzt bereits einen aktiven Zugang';
+    end if;
+
+    -- Ein bisheriges Kinderprofil kann spaeter zu Jugend/Erwachsen wechseln.
+    -- Dabei bleiben Tipps und Punkte erhalten, nur die alte Lead-Zuordnung wird geloest.
+    update public.participant_profiles
+    set account_user_id = null
+    where id = target_profile;
   end if;
 
   insert into public.participant_invites(

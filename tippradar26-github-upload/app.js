@@ -2296,9 +2296,17 @@ document.querySelector("#team-grid").addEventListener("click", async (event) => 
       renderTeams();
       showToast("Einladung gesendet", `${member.name} erhält jetzt einen persönlichen Anmeldelink.`);
     } catch (error) {
-      actionButton.disabled = false;
-      actionButton.textContent = "Einladen";
-      showToast("Einladung nicht gesendet", error.message);
+      try {
+        const invites = await window.TippRadarCloud.loadParticipantInvites();
+        participantInvites = Object.fromEntries(invites.map((invite) => [
+          invite.display_name.trim().toLowerCase(), invite
+        ]));
+      } catch {}
+      renderTeams();
+      showToast(
+        error.inviteSaved ? "E-Mail gespeichert, Versand offen" : "Einladung nicht gesendet",
+        error.message
+      );
     }
   }
   if (action === "rename-player") {

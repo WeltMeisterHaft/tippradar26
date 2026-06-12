@@ -165,8 +165,13 @@
         shouldCreateUser: true
       }
     });
-    if (mailError) throw mailError;
-    return loadParticipantInvites();
+    const invites = await loadParticipantInvites();
+    if (mailError) {
+      const error = new Error(mailError.message || "Der Anmeldelink konnte nicht versendet werden.");
+      error.inviteSaved = true;
+      throw error;
+    }
+    return invites;
   }
 
   async function signOut() {

@@ -31,6 +31,10 @@ direkt einen persoenlichen Anmeldelink senden. Nach dem Klick wird der Zugang
 automatisch dem vorbereiteten Profil zugeordnet. Kinder benoetigen weiterhin
 keine eigene E-Mail-Adresse.
 
+Wird ein bisheriges Kinderprofil spaeter auf `Jugend` oder `Erwachsen`
+umgestellt, kann es anschliessend ebenfalls eingeladen werden. Vorhandene Tipps
+und Punkte bleiben dabei erhalten.
+
 ## 2. Web-App aktualisieren
 
 Den Inhalt des Web-Pakets in das GitHub-Repository hochladen. Der Ordner `api` muss als Ordner erhalten bleiben. Vercel erstellt danach automatisch ein neues Deployment.
