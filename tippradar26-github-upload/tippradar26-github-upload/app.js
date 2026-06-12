@@ -79,7 +79,7 @@ const simulationModelStorageKey = "tippradar26-simulation-model-v1";
 let simulationModel = localStorage.getItem(simulationModelStorageKey) || "own";
 let tournamentSchedule = (() => {
   try {
-    return JSON.parse(localStorage.getItem(scheduleStorageKey) || "[]");
+    return assignGroupLetters(JSON.parse(localStorage.getItem(scheduleStorageKey) || "[]"));
   } catch {
     return [];
   }
@@ -229,10 +229,10 @@ async function loadOpenLigaMatches() {
     const response = await fetch("https://api.openligadb.de/getmatchdata/wm26/2026");
     if (!response.ok) throw new Error(`OpenLigaDB ${response.status}`);
     const data = await response.json();
-    const normalized = data
+    const normalized = assignGroupLetters(data
       .filter((match) => match.team1 && match.team2)
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
-      .map(normalizeOpenLigaMatch);
+      .map(normalizeOpenLigaMatch));
     if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
     tournamentSchedule = normalized;
     localStorage.setItem(scheduleStorageKey, JSON.stringify(normalized));
@@ -386,9 +386,80 @@ function updateProgress() {
 }
 
 function groupLetterForMatch(match) {
+  if (match.groupLetter) return match.groupLetter;
   const label = `${match.group || ""} ${match.matchday || ""}`;
-  const matchResult = label.match(/(?:gruppe|group)\s*([A-L])\b/i);
+  const matchResult = label.match(/(?:gruppe|group)\s*([A-L])\b/i)
+    || label.match(/^\s*([A-L])(?:\s|$)/i);
   return matchResult?.[1]?.toUpperCase() || null;
+}
+
+const worldCupGroupTeams = {
+  A: ["mexico", "mexiko", "south africa", "sudafrika", "south korea", "sudkorea", "czech republic", "czechia", "tschechien"],
+  B: ["canada", "kanada", "bosnia and herzegovina", "bosnien-herzegowina", "qatar", "katar", "switzerland", "schweiz"],
+  C: ["brazil", "brasilien", "morocco", "marokko", "haiti", "scotland", "schottland"],
+  D: ["united states", "usa", "paraguay", "australia", "australien", "turkey", "turkei"],
+  E: ["germany", "deutschland", "curacao", "ivory coast", "cote d'ivoire", "elfenbeinkuste", "ecuador"],
+  F: ["netherlands", "niederlande", "japan", "sweden", "schweden", "tunisia", "tunesien"],
+  G: ["belgium", "belgien", "egypt", "agypten", "iran", "new zealand", "neuseeland"],
+  H: ["spain", "spanien", "cape verde", "kap verde", "saudi arabia", "saudi-arabien", "uruguay"],
+  I: ["france", "frankreich", "senegal", "iraq", "irak", "norway", "norwegen"],
+  J: ["argentina", "argentinien", "algeria", "algerien", "austria", "osterreich", "jordan", "jordanien"],
+  K: ["portugal", "dr congo", "dr kongo", "uzbekistan", "usbekistan", "colombia", "kolumbien"],
+  L: ["england", "croatia", "kroatien", "ghana", "panama"]
+};
+const worldCupGroupByTeam = Object.fromEntries(Object.entries(worldCupGroupTeams)
+  .flatMap(([group, names]) => names.map((name) => [normalizedTeamName(name), group])));
+
+function assignGroupLetters(schedule) {
+  const groupStage = schedule.filter((match) => {
+    const kickoff = new Date(match.kickoff).getTime();
+    return Number.isFinite(kickoff) && kickoff < new Date("2026-06-28T00:00:00Z").getTime();
+  });
+  const neighbors = {};
+  groupStage.forEach((match) => {
+    neighbors[match.home] ||= new Set();
+    neighbors[match.away] ||= new Set();
+    neighbors[match.home].add(match.away);
+    neighbors[match.away].add(match.home);
+  });
+  const components = [];
+  const visited = new Set();
+  Object.keys(neighbors).forEach((team) => {
+    if (visited.has(team)) return;
+    const component = [];
+    const queue = [team];
+    visited.add(team);
+    while (queue.length) {
+      const current = queue.shift();
+      component.push(current);
+      neighbors[current].forEach((opponent) => {
+        if (visited.has(opponent)) return;
+        visited.add(opponent);
+        queue.push(opponent);
+      });
+    }
+    if (component.length >= 2) {
+      const firstKickoff = Math.min(...groupStage
+        .filter((match) => component.includes(match.home) || component.includes(match.away))
+        .map((match) => new Date(match.kickoff).getTime()));
+      components.push({ teams: component, firstKickoff });
+    }
+  });
+  components.sort((a, b) => a.firstKickoff - b.firstKickoff);
+  const teamGroup = {};
+  components.slice(0, 12).forEach((component, index) => {
+    const letter = String.fromCharCode(65 + index);
+    component.teams.forEach((team) => { teamGroup[team] = letter; });
+  });
+  return schedule.map((match) => ({
+    ...match,
+    groupLetter: groupLetterForMatch(match)
+      || worldCupGroupByTeam[normalizedTeamName(match.home)]
+      || worldCupGroupByTeam[normalizedTeamName(match.away)]
+      || teamGroup[match.home]
+      || teamGroup[match.away]
+      || null
+  }));
 }
 
 function simulationTipForMatch(match, ownTips) {
