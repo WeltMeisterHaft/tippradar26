@@ -79,7 +79,7 @@ const simulationModelStorageKey = "tippradar26-simulation-model-v1";
 let simulationModel = localStorage.getItem(simulationModelStorageKey) || "own";
 let tournamentSchedule = (() => {
   try {
-    return assignGroupLetters(JSON.parse(localStorage.getItem(scheduleStorageKey) || "[]"));
+    return JSON.parse(localStorage.getItem(scheduleStorageKey) || "[]");
   } catch {
     return [];
   }
@@ -409,6 +409,52 @@ const worldCupGroupTeams = {
 };
 const worldCupGroupByTeam = Object.fromEntries(Object.entries(worldCupGroupTeams)
   .flatMap(([group, names]) => names.map((name) => [normalizedTeamName(name), group])));
+const worldCupGroupDisplay = {
+  A: ["Mexiko", "S\u00fcdafrika", "S\u00fdkorea", "Tschechien"],
+  B: ["Kanada", "Bosnien-Herzegowina", "Katar", "Schweiz"],
+  C: ["Brasilien", "Marokko", "Haiti", "Schottland"],
+  D: ["USA", "Paraguay", "Australien", "T\u00fcrkei"],
+  E: ["Deutschland", "Cura\u00e7ao", "Elfenbeink\u00fcste", "Ecuador"],
+  F: ["Niederlande", "Japan", "Schweden", "Tunesien"],
+  G: ["Belgien", "\u00c4gypten", "Iran", "Neuseeland"],
+  H: ["Spanien", "Kap Verde", "Saudi-Arabien", "Uruguay"],
+  I: ["Frankreich", "Senegal", "Irak", "Norwegen"],
+  J: ["Argentinien", "Algerien", "\u00d6sterreich", "Jordanien"],
+  K: ["Portugal", "DR Kongo", "Usbekistan", "Kolumbien"],
+  L: ["England", "Kroatien", "Ghana", "Panama"]
+};
+tournamentSchedule = assignGroupLetters(tournamentSchedule);
+
+function sameNationalTeam(first, second) {
+  return canonicalNationalTeam(first) === canonicalNationalTeam(second);
+}
+
+function officialSimulationMatches() {
+  return Object.entries(worldCupGroupDisplay).flatMap(([group, teams]) =>
+    teams.flatMap((home, homeIndex) =>
+      teams.slice(homeIndex + 1).map((away) => {
+        const liveMatch = tournamentSchedule.find((match) =>
+          (sameNationalTeam(match.home, home) && sameNationalTeam(match.away, away))
+          || (sameNationalTeam(match.home, away) && sameNationalTeam(match.away, home))
+        );
+        const reversed = liveMatch && sameNationalTeam(liveMatch.home, away);
+        const liveResult = liveMatch?.result?.split(":").map(Number);
+        const result = liveResult?.length === 2
+          ? `${reversed ? liveResult[1] : liveResult[0]}:${reversed ? liveResult[0] : liveResult[1]}`
+          : null;
+        return {
+          id: liveMatch?.id || `simulation-${group}-${homeIndex}-${teams.indexOf(away)}`,
+          group: `Gruppe ${group}`,
+          groupLetter: group,
+          home,
+          away,
+          result,
+          sourceMatch: liveMatch || null
+        };
+      })
+    )
+  );
+}
 
 function assignGroupLetters(schedule) {
   const groupStage = schedule.filter((match) => {
@@ -463,7 +509,12 @@ function assignGroupLetters(schedule) {
 }
 
 function simulationTipForMatch(match, ownTips) {
-  if (simulationModel === "own") return ownTips[String(match.id)] || null;
+  if (simulationModel === "own") {
+    const directTip = ownTips[String(match.id)];
+    if (!directTip || !match.sourceMatch) return directTip || null;
+    const reversed = sameNationalTeam(match.sourceMatch.home, match.away);
+    return reversed ? { home: directTip.away, away: directTip.home } : directTip;
+  }
   const [home, away] = botTip({
     id: `simulation-${simulationModel}`,
     strategy: simulationModel
@@ -473,7 +524,7 @@ function simulationTipForMatch(match, ownTips) {
 
 function simulatedGroupStandings() {
   const ownTips = simulationModel === "own" ? collectTips() : {};
-  const groupMatches = tournamentSchedule.filter((match) => groupLetterForMatch(match));
+  const groupMatches = officialSimulationMatches();
   const groups = {};
   let predicted = 0;
   groupMatches.forEach((match) => {
