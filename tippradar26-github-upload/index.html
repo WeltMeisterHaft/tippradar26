@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260612-1700">
+  <link rel="stylesheet" href="styles.css?v=20260612-1730">
 </head>
 <body>
   <div class="app-shell">
@@ -124,6 +124,7 @@
                   <option value="dog">DOG / Zufall</option>
                   <option value="rank">RANK / FIFA-Rangliste</option>
                   <option value="stat">STAT / Tormodell</option>
+                  <option value="dna">DNA / WM-Erfahrung</option>
                 </select>
               </label>
               <button class="secondary-button" id="refresh-simulation">Aktualisieren</button>
@@ -132,7 +133,7 @@
           <div class="simulation-status" id="simulation-status"></div>
           <div class="simulation-groups" id="simulation-groups"></div>
           <div class="simulation-bracket" id="simulation-bracket"></div>
-          <p class="simulation-note">Vorschau nach Punkten, Tordifferenz und erzielten Toren. Direkter Vergleich und Fair-Play-Wertung sind nicht simuliert. Bei Remis entscheidet RANK/STAT nach Ranglistenst&auml;rke, DOG per stabilem Zufallsentscheid. Die Zuordnung der acht besten Gruppendritten bleibt eine Projektion.</p>
+          <p class="simulation-note">Vorschau nach Punkten, Tordifferenz und erzielten Toren. DNA kombiniert FIFA-Rang und historische WM-Finalbilanz; bei &auml;hnlich starken Teams z&auml;hlt die Turniererfahrung. Direkter Vergleich und Fair-Play-Wertung sind nicht simuliert. Die Zuordnung der acht besten Gruppendritten bleibt eine Projektion.</p>
         </section>
         <section class="fantasy-card">
           <div class="fantasy-heading">
@@ -311,7 +312,7 @@
         </section>
       </section>
     </main>
-    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.12-1700</span></footer>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.12-1730</span></footer>
 
     <nav class="mobile-nav" aria-label="Mobile Navigation">
       <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
@@ -370,8 +371,8 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260612-1700"></script>
-  <script src="cloud.js?v=20260612-1700"></script>
-  <script src="app.js?v=20260612-1700"></script>
+  <script src="config.js?v=20260612-1730"></script>
+  <script src="cloud.js?v=20260612-1730"></script>
+  <script src="app.js?v=20260612-1730"></script>
 </body>
 </html>

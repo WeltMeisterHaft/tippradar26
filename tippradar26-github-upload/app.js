@@ -32,6 +32,18 @@ const fifaRank = {
   "usbekistan": 49, "neuseeland": 50, "jordanien": 51, "kap verde": 52,
   "curacao": 53, "bosnien-herzegowina": 70, "bosnien und herzegowina": 70
 };
+const worldCupFinalRecord = {
+  "deutschland": { titles: 4, finals: 8 },
+  "brasilien": { titles: 5, finals: 7 },
+  "argentinien": { titles: 3, finals: 6 },
+  "argentina": { titles: 3, finals: 6 },
+  "frankreich": { titles: 2, finals: 4 },
+  "niederlande": { titles: 0, finals: 3 },
+  "spanien": { titles: 1, finals: 1 },
+  "england": { titles: 1, finals: 1 },
+  "uruguay": { titles: 2, finals: 2 },
+  "kroatien": { titles: 0, finals: 1 }
+};
 const teamBonusDefaults = [
   { id: "team-match", criterion: "team_best_match", name: "Bestes Team je Spiel", points: 1, locked: true, teamRule: true },
   { id: "team-matchday", criterion: "team_best_matchday", name: "Bestes Team je Spieltag", points: 1, locked: true, teamRule: true }
@@ -616,6 +628,13 @@ function simulateKnockoutMatch(home, away, matchId) {
     if (strategy === "dog") {
       winner = seededNumber(`${matchId}-${home.team}-${away.team}`) >= 0.5 ? home : away;
       decidedBy = "n. E.";
+    } else if (strategy === "dna") {
+      const homeDna = tournamentDnaScore(home.team);
+      const awayDna = tournamentDnaScore(away.team);
+      winner = homeDna === awayDna
+        ? (rankFor(home.team) <= rankFor(away.team) ? home : away)
+        : (homeDna > awayDna ? home : away);
+      decidedBy = "Turnier-DNA";
     } else {
       winner = rankFor(home.team) <= rankFor(away.team) ? home : away;
       decidedBy = "n. E.";
@@ -663,7 +682,8 @@ function renderTournamentSimulation() {
     own: "deinen eigenen Tipps",
     dog: "DOG / Zufall",
     rank: "RANK / FIFA-Rangliste",
-    stat: "STAT / Tormodell"
+    stat: "STAT / Tormodell",
+    dna: "DNA / WM-Erfahrung"
   };
   const groupEntries = Object.entries(simulation.groups).sort(([a], [b]) => a.localeCompare(b));
   if (!groupEntries.length) {
@@ -1034,6 +1054,20 @@ function rankTip(match) {
   return difference <= -25 ? "0:2" : "1:2";
 }
 
+function tournamentDnaScore(teamName) {
+  const normalized = normalizedTeamName(teamName);
+  const alias = Object.keys(worldCupFinalRecord)
+    .find((name) => normalized.includes(name) || name.includes(normalized));
+  const record = worldCupFinalRecord[normalized] || worldCupFinalRecord[alias] || { titles: 0, finals: 0 };
+  return (record.finals * 4) + (record.titles * 2);
+}
+
+function dnaTip(match) {
+  const difference = rankFor(match.away) - rankFor(match.home);
+  if (Math.abs(difference) <= 8) return "1:1";
+  return difference > 0 ? (difference >= 25 ? "2:0" : "2:1") : (difference <= -25 ? "0:2" : "1:2");
+}
+
 function poissonProbability(goals, expected) {
   let factorial = 1;
   for (let value = 2; value <= goals; value += 1) factorial *= value;
@@ -1061,6 +1095,7 @@ function dogTip(match, seed) {
 
 function botTip(member, match) {
   const strategy = member.strategy === "cooper" ? "stat" : (member.strategy || "dog");
+  if (strategy === "dna") return dnaTip(match);
   if (strategy === "stat") return statTip(match);
   if (strategy === "rank") return rankTip(match);
   return dogTip(match, member.id);
