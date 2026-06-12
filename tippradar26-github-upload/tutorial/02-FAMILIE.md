@@ -10,7 +10,8 @@
 Kinder benoetigen weder eine eigene E-Mail-Adresse noch ein eigenes Geraet.
 Jeder Erwachsene meldet sich mit einer eigenen E-Mail-Adresse an und kann nur das eigene Profil tippen.
 Der Family-Team-Lead kann zwischen dem eigenen Profil und den Kinderprofilen wechseln.
-Erwachsene und Jugendliche sehen dort nur ihr eigenes Profil.
+Der Family-Team-Lead kann bei Bedarf auch stellvertretend fuer Erwachsene und Jugendliche
+des eigenen Teams tippen. Erwachsene und Jugendliche sehen selbst nur ihr eigenes Profil.
 
 Jugendliche koennen vom Organisator als `Jugend` angelegt werden und sich mit einer eigenen
 E-Mail-Adresse selbst anmelden. Unter 16 Jahren bitte nur mit Zustimmung der Eltern.

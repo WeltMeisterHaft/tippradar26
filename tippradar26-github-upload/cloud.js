@@ -7,6 +7,7 @@
   let profiles = [];
   let activeProfile = null;
   let organizerName = "";
+  let manageableProfileIds = new Set();
 
   async function init() {
     if (!client) return { configured: false };
@@ -16,7 +17,10 @@
       session = nextSession;
       window.dispatchEvent(new CustomEvent("tippradar-auth-change", { detail: { session } }));
     });
-    if (session) await loadMembership();
+    if (session) {
+      await claimParticipantInvite();
+      await loadMembership();
+    }
     return { configured: true, session, league };
   }
 
@@ -65,8 +69,9 @@
     if (error) throw error;
     profiles = data || [];
     const owned = profiles.filter((profile) =>
-      profile.account_user_id === session.user.id
-      && (profile.is_primary || profile.profile_type === "child")
+      (profile.account_user_id === session.user.id
+        && (profile.is_primary || profile.profile_type === "child"))
+      || manageableProfileIds.has(profile.id)
     );
     const remembered = localStorage.getItem(`tippradar26-active-profile-${league.id}`);
     activeProfile = owned.find((profile) => profile.id === remembered)
@@ -77,13 +82,28 @@
   function selectProfile(profileId) {
     const profile = profiles.find((item) =>
       item.id === profileId
-      && item.account_user_id === session?.user?.id
-      && (item.is_primary || item.profile_type === "child")
+      && (
+        (item.account_user_id === session?.user?.id
+          && (item.is_primary || item.profile_type === "child"))
+        || manageableProfileIds.has(item.id)
+      )
     );
     if (!profile) return null;
     activeProfile = profile;
     localStorage.setItem(`tippradar26-active-profile-${league.id}`, profile.id);
     return profile;
+  }
+
+  function setManageableProfileIds(profileIds) {
+    manageableProfileIds = new Set((profileIds || []).map(String));
+  }
+
+  async function syncTeamParticipantProfiles() {
+    if (!league || !session) return 0;
+    const { data, error } = await client.rpc("sync_team_participant_profiles");
+    if (error) throw error;
+    await loadProfiles();
+    return Number(data || 0);
   }
 
   async function addFamilyProfile(displayName) {
@@ -107,6 +127,46 @@
       options: { emailRedirectTo: window.location.origin + window.location.pathname }
     });
     if (error) throw error;
+  }
+
+  async function claimParticipantInvite() {
+    if (!client || !session) return null;
+    const { data, error } = await client.rpc("claim_participant_invite");
+    if (error) throw error;
+    return data;
+  }
+
+  async function refreshSessionContext() {
+    if (!session) return null;
+    await claimParticipantInvite();
+    return loadMembership();
+  }
+
+  async function loadParticipantInvites() {
+    if (!league || league.role !== "organizer") return [];
+    const { data, error } = await client.rpc("list_participant_invites");
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function inviteParticipant(displayName, email) {
+    if (!league || league.role !== "organizer") {
+      throw new Error("Nur der Organisator darf Einladungen versenden.");
+    }
+    const { error: inviteError } = await client.rpc("set_participant_invite", {
+      target_name: displayName,
+      target_email: email
+    });
+    if (inviteError) throw inviteError;
+    const { error: mailError } = await client.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + window.location.pathname,
+        shouldCreateUser: true
+      }
+    });
+    if (mailError) throw mailError;
+    return loadParticipantInvites();
   }
 
   async function signOut() {
@@ -503,8 +563,10 @@
   }
 
   window.TippRadarCloud = {
-    init, sendMagicLink, signOut, createLeague, joinLeague, ensurePrimaryProfile,
-    loadProfiles, selectProfile, addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
+    init, sendMagicLink, claimParticipantInvite, refreshSessionContext,
+    loadParticipantInvites, inviteParticipant, signOut, createLeague, joinLeague, ensurePrimaryProfile,
+    loadProfiles, selectProfile, setManageableProfileIds, syncTeamParticipantProfiles,
+    addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
     loadState, saveState, setScoringStart, loadPredictions, loadLeaguePredictions, savePredictions, savePredictionsForProfile, saveBotPredictions,
     loadFantasyPicks, saveFantasyPicks, recordPlayerEvent, replaceGoalEvents, loadScorerTotals, loadStandings,
     loadFootballDay, loadTeamSquad, loadPublicSquad, loadFootballEvents,

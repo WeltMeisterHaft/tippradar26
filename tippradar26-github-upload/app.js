@@ -77,6 +77,7 @@ let profileStandings = [];
 let scoringStart = null;
 let pointDetails = null;
 let scorerTotals = {};
+let participantInvites = {};
 let internationalStats = (() => {
   try {
     return JSON.parse(localStorage.getItem(internationalStatsStorageKey) || "[]");
@@ -90,6 +91,13 @@ const matchViewStorageKey = "tippradar26-match-view-v1";
 let activeMatchView = localStorage.getItem(matchViewStorageKey) || "next-12";
 const simulationModelStorageKey = "tippradar26-simulation-model-v1";
 let simulationModel = localStorage.getItem(simulationModelStorageKey) || "own";
+const knockoutPhases = [
+  { key: "r32", label: "Sechzehntelfinale", short: "16 SPIELE", start: 73, count: 16, kickoff: "2026-06-28T19:00:00Z" },
+  { key: "r16", label: "Achtelfinale", short: "8 SPIELE", start: 89, count: 8, kickoff: "2026-07-04T15:00:00Z" },
+  { key: "qf", label: "Viertelfinale", short: "4 SPIELE", start: 97, count: 4, kickoff: "2026-07-09T19:00:00Z" },
+  { key: "sf", label: "Halbfinale", short: "2 SPIELE", start: 101, count: 2, kickoff: "2026-07-14T19:00:00Z" },
+  { key: "final", label: "Finale", short: "1 SPIEL", start: 104, count: 1, kickoff: "2026-07-19T19:00:00Z" }
+];
 let tournamentSchedule = (() => {
   try {
     return JSON.parse(localStorage.getItem(scheduleStorageKey) || "[]");
@@ -188,44 +196,57 @@ function updateHomeHero(schedule) {
 
 function updateDateTabs(schedule) {
   const container = document.querySelector("#date-tabs");
-  if (!container || !schedule?.length) return;
-  const today = dateKey(new Date());
-  const grouped = Object.values(schedule.reduce((days, match) => {
-    const key = dateKey(match.kickoff);
-    days[key] ||= { key, date: new Date(match.kickoff), count: 0 };
-    days[key].count += 1;
-    return days;
-  }, {})).sort((a, b) => a.date - b.date);
-  const futureDays = grouped.filter((day) => day.key >= today);
-  const visibleDays = (futureDays.length ? futureDays : grouped.slice(-6)).slice(0, 8);
-  const openCount = schedule.filter(isMatchOpen).length;
+  if (!container) return;
+  schedule = Array.isArray(schedule) ? schedule : [];
+  const allMatches = allTippableMatches();
+  const openCount = allMatches.filter(isMatchOpen).length;
+  const groupRounds = [1, 2, 3].map((round) => ({
+    round,
+    count: schedule.filter((match) => groupStageRound(match, schedule) === round).length
+  }));
   container.innerHTML = `
-    <button class="date-tab ${activeMatchView === "next-12" ? "active" : ""}" data-match-view="next-12">
-      <small>SCHNELLWAHL</small><strong>N&Auml;CHSTE 12</strong><span>kompakte Ansicht</span>
-    </button>
-    <button class="date-tab ${activeMatchView === "all-open" ? "active" : ""}" data-match-view="all-open">
-      <small>VORAUS TIPPEN</small><strong>ALLE OFFENEN</strong><span>${openCount} Spiele</span>
-    </button>
-  ${visibleDays.map((day) => {
-    const weekday = new Intl.DateTimeFormat("de-DE", {
-      weekday: "short", timeZone: "Europe/Berlin"
-    }).format(day.date).replace(".", "").toUpperCase();
-    const date = new Intl.DateTimeFormat("de-DE", {
-      day: "2-digit", month: "short", timeZone: "Europe/Berlin"
-    }).format(day.date).replace(".", "").toUpperCase();
-    return `<button class="date-tab ${activeMatchView === `date:${day.key}` ? "active" : ""}" data-match-view="date:${day.key}">
-      <small>${weekday}</small><strong>${date}</strong><span>${day.count} Spiel${day.count === 1 ? "" : "e"}</span>
-    </button>`;
-  }).join("")}`;
+    <div class="tip-stage">
+      <strong>Vorrunde</strong>
+      <div>
+        ${groupRounds.map(({ round, count }) => `
+          <button class="date-tab ${activeMatchView === `group:${round}` ? "active" : ""}" data-match-view="group:${round}">
+            <small>GRUPPE</small><strong>SPIELTAG ${round}</strong><span>${count} Spiele</span>
+          </button>`).join("")}
+      </div>
+    </div>
+    <div class="tip-stage">
+      <strong>K.-o.-Runde</strong>
+      <div>
+        ${knockoutPhases.map((phase) => `
+          <button class="date-tab ${activeMatchView === `ko:${phase.key}` ? "active" : ""}" data-match-view="ko:${phase.key}">
+            <small>K.O.</small><strong>${phase.label.toUpperCase()}</strong><span>${phase.short}</span>
+          </button>`).join("")}
+      </div>
+    </div>
+    <div class="tip-stage compact">
+      <strong>Schnellwahl</strong>
+      <div>
+        <button class="date-tab ${activeMatchView === "next-12" ? "active" : ""}" data-match-view="next-12">
+          <small>JETZT</small><strong>N&Auml;CHSTE 12</strong><span>kompakte Ansicht</span>
+        </button>
+        <button class="date-tab ${activeMatchView === "all-open" ? "active" : ""}" data-match-view="all-open">
+          <small>ALLE</small><strong>ALLE OFFENEN</strong><span>${openCount} Spiele</span>
+        </button>
+      </div>
+    </div>`;
 }
 
 function applyMatchView(schedule = tournamentSchedule) {
-  const openMatches = schedule.filter(isMatchOpen);
+  const allMatches = allTippableMatches();
+  const openMatches = allMatches.filter(isMatchOpen);
   if (activeMatchView === "all-open") {
     matches = openMatches;
-  } else if (activeMatchView.startsWith("date:")) {
-    const selectedDate = activeMatchView.slice(5);
-    matches = schedule.filter((match) => dateKey(match.kickoff) === selectedDate);
+  } else if (activeMatchView.startsWith("group:")) {
+    const round = Number(activeMatchView.slice(6));
+    matches = schedule.filter((match) => groupStageRound(match, schedule) === round);
+  } else if (activeMatchView.startsWith("ko:")) {
+    const phase = activeMatchView.slice(3);
+    matches = projectedKnockoutMatches().filter((match) => match.phase === phase);
     if (!matches.length) {
       activeMatchView = "next-12";
       matches = openMatches.slice(0, 12);
@@ -233,7 +254,7 @@ function applyMatchView(schedule = tournamentSchedule) {
   } else {
     matches = openMatches.slice(0, 12);
   }
-  if (!matches.length) matches = schedule.slice(-12);
+  if (!matches.length) matches = allMatches.slice(-12);
 }
 
 async function loadOpenLigaMatches() {
@@ -242,10 +263,10 @@ async function loadOpenLigaMatches() {
     const response = await fetch("https://api.openligadb.de/getmatchdata/wm26/2026");
     if (!response.ok) throw new Error(`OpenLigaDB ${response.status}`);
     const data = await response.json();
-    const normalized = assignGroupLetters(data
+    const normalized = assignKnockoutProjectionIds(assignGroupLetters(data
       .filter((match) => match.team1 && match.team2)
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
-      .map(normalizeOpenLigaMatch));
+      .map(normalizeOpenLigaMatch)));
     if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
     tournamentSchedule = normalized;
     localStorage.setItem(scheduleStorageKey, JSON.stringify(normalized));
@@ -255,7 +276,12 @@ async function loadOpenLigaMatches() {
     tournamentTeams = [...new Set(normalized.flatMap((match) => [match.home, match.away]))]
       .sort((a, b) => a.localeCompare(b, "de"));
     if (window.TippRadarCloud?.league?.role === "organizer") {
-      await window.TippRadarCloud.syncSchedule(normalized);
+      await window.TippRadarCloud.syncSchedule([
+        ...normalized,
+        ...projectionScheduleSlots().filter((slot) =>
+          !normalized.some((match) => String(match.id) === String(slot.id))
+        )
+      ]);
     }
     applyMatchView(normalized);
     await syncOwnedAutomaticProfiles();
@@ -302,21 +328,32 @@ async function loadOpenLigaMatches() {
 function renderMatches() {
   const activeAutoStrategy = window.TippRadarCloud?.activeProfile?.auto_strategy || "manual";
   const automatic = activeAutoStrategy !== "manual";
+  const cloud = window.TippRadarCloud;
+  const activeProfile = cloud?.activeProfile;
+  const delegatedAdultOrYouth = Boolean(
+    cloud?.session
+    && activeProfile
+    && activeProfile.account_user_id !== cloud.session.user.id
+    && ["adult", "youth"].includes(activeProfile.profile_type)
+  );
   matchesList.innerHTML = matches.length ? matches.map((match) => {
     const tip = savedTips[match.id] || {};
+    const delegatedTipLocked = delegatedAdultOrYouth
+      && tip.home !== undefined && tip.away !== undefined;
     const counted = isMatchCounted(match);
     const open = isMatchOpen(match) && counted;
+    const editable = open && !automatic && !delegatedTipLocked;
     return `
-      <article class="match-card ${open ? "" : "match-locked"}" data-match="${match.id}" data-kickoff="${match.kickoff}">
-        <div class="match-meta"><strong>${match.time}</strong><span>${match.group}</span></div>
+      <article class="match-card ${open ? "" : "match-locked"} ${delegatedTipLocked ? "delegated-tip-locked" : ""}" data-match="${match.id}" data-kickoff="${match.kickoff}">
+        <div class="match-meta"><strong>${match.time}</strong><span>${match.group}</span>${match.projection ? '<small class="projection-hint">Vorschlag aus deinen Tipps</small>' : ""}</div>
         <div class="match-teams">
           <div class="match-team"><span class="small-flag">${match.homeFlag}</span>${match.home}</div>
           <div class="match-team"><span class="small-flag">${match.awayFlag}</span>${match.away}</div>
         </div>
         <div class="score-inputs" aria-label="Ergebnis fuer ${match.home} gegen ${match.away}">
-          <input class="score-input" data-side="home" type="number" min="0" max="20" inputmode="numeric" value="${tip.home ?? ""}" aria-label="Tore ${match.home}" ${open && !automatic ? "" : "disabled"}>
+          <input class="score-input" data-side="home" type="number" min="0" max="20" inputmode="numeric" value="${tip.home ?? ""}" aria-label="Tore ${match.home}" ${editable ? "" : "disabled"}>
           <span>:</span>
-          <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}" ${open && !automatic ? "" : "disabled"}>
+          <input class="score-input" data-side="away" type="number" min="0" max="20" inputmode="numeric" value="${tip.away ?? ""}" aria-label="Tore ${match.away}" ${editable ? "" : "disabled"}>
         </div>
         <div class="match-insights">
           <div class="cooper-pick">
@@ -333,6 +370,8 @@ function renderMatches() {
         </div>
         ${!counted
           ? '<div class="locked-label excluded-label">Au&szlig;er Wertung</div>'
+          : delegatedTipLocked && open
+          ? '<div class="locked-label delegated-label">Bereits gespeichert &middot; nur das eigene Profil darf &auml;ndern</div>'
           : automatic && open
           ? `<div class="locked-label auto-label">AUTO · ${activeAutoStrategy.toUpperCase()}</div>`
           : (open ? "" : '<div class="locked-label">Tipp geschlossen</div>')}
@@ -380,7 +419,7 @@ function collectTips() {
 
 function updateProgress() {
   const tips = collectTips();
-  const availableMatches = tournamentSchedule.filter((match) => isMatchOpen(match) && isMatchCounted(match));
+  const availableMatches = allTippableMatches().filter((match) => isMatchOpen(match) && isMatchCounted(match));
   const count = availableMatches.filter((match) => tips[String(match.id)]?.home !== undefined
     && tips[String(match.id)]?.away !== undefined).length;
   document.querySelector("#tip-progress").textContent = `${count} von ${availableMatches.length} offenen Spielen getippt`;
@@ -616,19 +655,180 @@ function projectedThirdAssignments(thirds) {
   return assignment;
 }
 
+function isGroupStageMatch(match) {
+  const kickoff = new Date(match.kickoff).getTime();
+  return Number.isFinite(kickoff) && kickoff < new Date(knockoutPhases[0].kickoff).getTime();
+}
+
+function groupStageRound(match, schedule = tournamentSchedule) {
+  if (!isGroupStageMatch(match)) return null;
+  const group = groupLetterForMatch(match);
+  const groupMatches = schedule.filter((item) =>
+    isGroupStageMatch(item) && groupLetterForMatch(item) === group
+  ).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
+  const index = groupMatches.findIndex((item) => String(item.id) === String(match.id));
+  return index < 0 ? null : Math.min(3, Math.floor(index / 2) + 1);
+}
+
+function initialKnockoutPairings(simulation) {
+  const groupEntries = Object.entries(simulation.groups);
+  const thirds = groupEntries.map(([group, rows]) => rows[2]).filter(Boolean)
+    .sort((a, b) =>
+      b.points - a.points
+      || b.goalDifference - a.goalDifference
+      || b.goalsFor - a.goalsFor
+      || a.team.localeCompare(b.team, "de")
+    ).slice(0, 8);
+  const first = (group) => simulation.groups[group]?.[0];
+  const second = (group) => simulation.groups[group]?.[1];
+  const thirdAssignments = projectedThirdAssignments(thirds);
+  const projectedThird = (matchNumber, allowed) => thirdAssignments[matchNumber]
+    || { team: `3. aus ${allowed.split("").join("/")}`, group: "?" };
+  return [
+    [second("A"), second("B")],
+    [first("E"), projectedThird(74, "ABCDF")],
+    [first("F"), second("C")],
+    [first("C"), second("F")],
+    [first("I"), projectedThird(77, "CDFGH")],
+    [second("E"), second("I")],
+    [first("A"), projectedThird(79, "CEFHI")],
+    [first("L"), projectedThird(80, "EHIJK")],
+    [first("D"), projectedThird(81, "BEFIJ")],
+    [first("G"), projectedThird(82, "AEHIJ")],
+    [second("K"), second("L")],
+    [first("H"), second("J")],
+    [first("B"), projectedThird(85, "EFGIJ")],
+    [first("J"), second("H")],
+    [first("K"), projectedThird(87, "DEIJL")],
+    [second("D"), second("G")]
+  ];
+}
+
+function projectedWinner(match, tips) {
+  const tip = tips[String(match.id)];
+  if (tip && Number(tip.home) !== Number(tip.away)) {
+    return Number(tip.home) > Number(tip.away) ? match.homeEntry : match.awayEntry;
+  }
+  const [home, away] = statTip(match).split(":").map(Number);
+  if (home !== away) return home > away ? match.homeEntry : match.awayEntry;
+  return rankFor(match.home) <= rankFor(match.away) ? match.homeEntry : match.awayEntry;
+}
+
+function knockoutPhaseForDate(kickoff) {
+  const time = new Date(kickoff).getTime();
+  for (let index = knockoutPhases.length - 1; index >= 0; index -= 1) {
+    if (time >= new Date(knockoutPhases[index].kickoff).getTime()) return knockoutPhases[index];
+  }
+  return null;
+}
+
+function assignKnockoutProjectionIds(schedule) {
+  const grouped = Object.fromEntries(knockoutPhases.map((phase) => [phase.key, []]));
+  schedule.forEach((match) => {
+    if (isGroupStageMatch(match)) return;
+    const phase = knockoutPhaseForDate(match.kickoff);
+    if (phase) grouped[phase.key].push(match);
+  });
+  Object.values(grouped).forEach((matchesInPhase) =>
+    matchesInPhase.sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  );
+  return schedule.map((match) => {
+    if (isGroupStageMatch(match)) return match;
+    const phase = knockoutPhaseForDate(match.kickoff);
+    const index = phase ? grouped[phase.key].indexOf(match) : -1;
+    return phase && index >= 0 && index < phase.count
+      ? { ...match, id: `projection-${phase.start + index}`, officialMatchId: String(match.id) }
+      : match;
+  });
+}
+
+function projectedKnockoutMatches(tips = collectTips()) {
+  const simulation = simulatedGroupStandings();
+  let entrants = initialKnockoutPairings(simulation);
+  const projected = [];
+  const officialByPhase = Object.fromEntries(knockoutPhases.map((phase) => [
+    phase.key,
+    tournamentSchedule.filter((match) =>
+      !isGroupStageMatch(match) && knockoutPhaseForDate(match.kickoff)?.key === phase.key
+    ).sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))
+  ]));
+
+  knockoutPhases.forEach((phase) => {
+    const phaseMatches = [];
+    for (let index = 0; index < phase.count; index += 1) {
+      const official = officialByPhase[phase.key][index];
+      const pairing = entrants[index] || [];
+      const homeEntry = official ? { team: official.home } : pairing[0];
+      const awayEntry = official ? { team: official.away } : pairing[1];
+      const id = `projection-${phase.start + index}`;
+      const match = {
+        id,
+        slot: phase.start + index,
+        phase: phase.key,
+        kickoff: official?.kickoff || phase.kickoff,
+        time: official?.time || `bis ${new Intl.DateTimeFormat("de-DE", {
+          day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin"
+        }).format(new Date(phase.kickoff))}`,
+        group: official ? phase.label : `${phase.label} · Vorschlag aus deinen Tipps`,
+        matchday: phase.label,
+        home: homeEntry?.team || "Noch offen",
+        away: awayEntry?.team || "Noch offen",
+        homeEntry: homeEntry || { team: "Noch offen" },
+        awayEntry: awayEntry || { team: "Noch offen" },
+        homeFlag: official?.homeFlag || "&#x26BD;",
+        awayFlag: official?.awayFlag || "&#x26BD;",
+        result: official?.result || null,
+        projection: !official,
+        openLigaId: official?.openLigaId || null
+      };
+      phaseMatches.push(match);
+      projected.push(match);
+    }
+    entrants = phaseMatches.length > 1
+      ? Array.from({ length: Math.ceil(phaseMatches.length / 2) }, (_, index) => [
+          projectedWinner(phaseMatches[index * 2], tips),
+          projectedWinner(phaseMatches[(index * 2) + 1], tips)
+        ])
+      : [];
+  });
+  return projected;
+}
+
+function projectionScheduleSlots() {
+  return knockoutPhases.flatMap((phase) =>
+    Array.from({ length: phase.count }, (_, index) => ({
+      id: `projection-${phase.start + index}`,
+      kickoff: phase.kickoff,
+      matchday: phase.label,
+      home: `Teilnehmer Spiel ${phase.start + index}`,
+      away: `Teilnehmer Spiel ${phase.start + index}`
+    }))
+  );
+}
+
+function allTippableMatches() {
+  return [
+    ...tournamentSchedule.filter(isGroupStageMatch),
+    ...projectedKnockoutMatches()
+  ].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || String(a.id).localeCompare(String(b.id)));
+}
+
 function simulateKnockoutMatch(home, away, matchId) {
   const strategy = simulationModel === "own" ? "stat" : simulationModel;
-  const [homeGoals, awayGoals] = botTip({ id: `knockout-${strategy}`, strategy }, {
-    id: `knockout-${matchId}-${home.team}-${away.team}`,
-    home: home.team,
-    away: away.team
-  }).split(":").map(Number);
+  const ownTip = simulationModel === "own" ? collectTips()[`projection-${matchId}`] : null;
+  const [homeGoals, awayGoals] = ownTip
+    ? [Number(ownTip.home), Number(ownTip.away)]
+    : botTip({ id: `knockout-${strategy}`, strategy }, {
+        id: `knockout-${matchId}-${home.team}-${away.team}`,
+        home: home.team,
+        away: away.team
+      }).split(":").map(Number);
   let winner = homeGoals > awayGoals ? home : away;
   let decidedBy = "";
   if (homeGoals === awayGoals) {
     if (strategy === "dog") {
       winner = seededNumber(`${matchId}-${home.team}-${away.team}`) >= 0.5 ? home : away;
-      decidedBy = "n. E.";
+      decidedBy = ownTip ? "Vorschlag n. E." : "n. E.";
     } else if (strategy === "dna") {
       const homeDna = tournamentDnaScore(home.team);
       const awayDna = tournamentDnaScore(away.team);
@@ -1186,7 +1386,7 @@ function updateRoundSummary() {
   const participantMetric = document.querySelector("#metric-participants");
   const matchMetric = document.querySelector("#metric-matches");
   if (participantMetric) participantMetric.textContent = humanCount;
-  if (matchMetric) matchMetric.textContent = tournamentSchedule.length || "\u2013";
+  if (matchMetric) matchMetric.textContent = tournamentSchedule.length ? allTippableMatches().length : "\u2013";
 }
 
 function updateHomeRanking() {
@@ -1538,6 +1738,16 @@ function renderTeams() {
                 </span>
                 ${member.bot ? `<small>${botStrategyNames[member.strategy === "cooper" ? "stat" : (member.strategy || "dog")]}</small>` : ""}
               </span>
+              ${canManageTeams && !member.bot && participantRole(member) !== "child" ? (() => {
+                const linkedProfile = profileForName(member.name);
+                const invite = participantInvites[member.name.trim().toLowerCase()];
+                const linked = Boolean(linkedProfile?.account_user_id);
+                return `<div class="member-invite ${linked ? "linked" : ""}">
+                  <input type="email" data-field="invite-email" value="${escapeHtml(invite?.email || "")}" placeholder="E-Mail-Adresse" ${linked ? "disabled" : ""}>
+                  <button data-action="invite-player" ${linked ? "disabled" : ""}>${linked ? "Zugang aktiv" : (invite ? "Erneut senden" : "Einladen")}</button>
+                  ${invite && !linked ? `<small>Versendet ${new Intl.DateTimeFormat("de-DE").format(new Date(invite.invited_at))}</small>` : ""}
+                </div>`;
+              })() : ""}
               <label class="weight-control">
                 <span>Faktor <b>${member.weight.toFixed(2)}</b></span>
                 <input type="range" min="0.75" max="1.25" step="0.05" value="${member.weight}" data-action="weight" ${canManageTeams ? "" : "disabled"}>
@@ -2031,7 +2241,7 @@ document.querySelector("#create-team").addEventListener("click", () => {
   showToast(`${name} angelegt`, "Jetzt kannst du Spieler hinzuf\u00fcgen.");
 });
 
-document.querySelector("#team-grid").addEventListener("click", (event) => {
+document.querySelector("#team-grid").addEventListener("click", async (event) => {
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton) return;
   const action = actionButton.dataset.action;
@@ -2066,6 +2276,29 @@ document.querySelector("#team-grid").addEventListener("click", (event) => {
     showToast(`${name} hinzugef\u00fcgt`, `Faktor 1,00 in ${team.name}`);
     if (bot && window.TippRadarCloud?.league?.role === "organizer") {
       window.TippRadarCloud.saveBotPredictions(allBotPredictions()).catch(() => {});
+    }
+  }
+  if (action === "invite-player") {
+    const memberRow = actionButton.closest("[data-member-id]");
+    const member = team.members.find((item) => item.id === memberRow.dataset.memberId);
+    const email = memberRow.querySelector('[data-field="invite-email"]')?.value.trim();
+    if (!email) {
+      showToast("E-Mail fehlt", "Bitte die E-Mail-Adresse des Teilnehmers eingeben.");
+      return;
+    }
+    actionButton.disabled = true;
+    actionButton.textContent = "Wird gesendet";
+    try {
+      const invites = await window.TippRadarCloud.inviteParticipant(member.name, email);
+      participantInvites = Object.fromEntries(invites.map((invite) => [
+        invite.display_name.trim().toLowerCase(), invite
+      ]));
+      renderTeams();
+      showToast("Einladung gesendet", `${member.name} erhält jetzt einen persönlichen Anmeldelink.`);
+    } catch (error) {
+      actionButton.disabled = false;
+      actionButton.textContent = "Einladen";
+      showToast("Einladung nicht gesendet", error.message);
     }
   }
   if (action === "rename-player") {
@@ -2215,9 +2448,21 @@ function setAccountPanel(name) {
 
 function ownedTippingProfiles(cloud) {
   if (!cloud?.session) return [];
-  return cloud.profiles.filter((profile) =>
+  const ownProfiles = cloud.profiles.filter((profile) =>
     profile.account_user_id === cloud.session.user.id
     && (profile.is_primary || profile.profile_type === "child")
+  );
+  const primary = ownProfiles.find((profile) => profile.is_primary);
+  if (primary?.profile_type !== "lead") return ownProfiles;
+  const leadTeam = teams.find((team) => team.members.some((member) =>
+    member.name.trim().toLowerCase() === primary.display_name.trim().toLowerCase()
+    && participantRole(member) === "lead"
+  ));
+  if (!leadTeam) return ownProfiles;
+  const teamNames = new Set(leadTeam.members.filter((member) => !member.bot)
+    .map((member) => member.name.trim().toLowerCase()));
+  return cloud.profiles.filter((profile) =>
+    teamNames.has(profile.display_name.trim().toLowerCase())
   );
 }
 
@@ -2244,6 +2489,11 @@ function updateProfileSelectors(cloud, ownedProfiles) {
   document.querySelector("#tip-profile-access").textContent = primary?.profile_type === "lead"
     ? `Als Team-Lead kannst du dein eigenes Profil und ${childCount ? `${childCount} Kinderprofil${childCount === 1 ? "" : "e"}` : "angelegte Kinderprofile"} auswählen.`
     : "Mit deinem eigenen Zugang kannst du ausschließlich für dich selbst tippen.";
+  if (primary?.profile_type === "lead") {
+    const delegatedCount = Math.max(0, ownedProfiles.length - 1);
+    document.querySelector("#tip-profile-access").textContent =
+      `Als Team-Lead kannst du freie Tipps fuer dein gesamtes Team erfassen${delegatedCount ? ` (${delegatedCount} weitere Profile)` : ""}. Bereits gespeicherte Tipps von Erwachsenen und Jugendlichen koennen nur diese selbst aendern.`;
+  }
   document.querySelector("#tip-profile-bar").hidden = false;
 }
 
@@ -2300,16 +2550,25 @@ function updateAccountUi() {
 async function syncFromCloud() {
   const cloud = window.TippRadarCloud;
   if (!cloud?.league) return;
+  if (cloud.league.role === "organizer") {
+    await cloud.syncSchedule([
+      ...tournamentSchedule,
+      ...projectionScheduleSlots().filter((slot) =>
+        !tournamentSchedule.some((match) => String(match.id) === String(slot.id))
+      )
+    ]);
+  }
   const [state, cloudTips] = await Promise.all([
     cloud.loadState(), cloud.loadPredictions()
   ]);
   const optionalResults = await Promise.allSettled([
     cloud.loadTeamScores(), cloud.loadLeaguePredictions(), cloud.loadFantasyPicks(),
-    cloud.loadStandings(), cloud.loadPointDetails(), cloud.loadScorerTotals()
+    cloud.loadStandings(), cloud.loadPointDetails(), cloud.loadScorerTotals(),
+    cloud.league.role === "organizer" ? cloud.loadParticipantInvites() : Promise.resolve([])
   ]);
   const [
     cloudTeamScoresResult, allTipsResult, cloudFantasyResult, standingsResult, detailsResult,
-    scorerTotalsResult
+    scorerTotalsResult, participantInvitesResult
   ] = optionalResults;
   const cloudTeamScores = cloudTeamScoresResult.status === "fulfilled" ? cloudTeamScoresResult.value : {};
   const allTips = allTipsResult.status === "fulfilled" ? allTipsResult.value : {};
@@ -2317,6 +2576,7 @@ async function syncFromCloud() {
   const standings = standingsResult.status === "fulfilled" ? standingsResult.value : [];
   const details = detailsResult.status === "fulfilled" ? detailsResult.value : null;
   const loadedScorerTotals = scorerTotalsResult.status === "fulfilled" ? scorerTotalsResult.value : {};
+  const loadedParticipantInvites = participantInvitesResult.status === "fulfilled" ? participantInvitesResult.value : [];
   const optionalFailures = optionalResults.filter((result) => result.status === "rejected");
   if (state) {
     const cleanedState = deduplicateBots(Array.isArray(state.teams) ? state.teams : teams);
@@ -2331,6 +2591,18 @@ async function syncFromCloud() {
     localStorage.setItem(teamStorageKey, JSON.stringify(teams));
     localStorage.setItem(ruleStorageKey, JSON.stringify(scoringRules));
   }
+  const ownPrimaryProfile = cloud.profiles.find((profile) =>
+    profile.account_user_id === cloud.session?.user?.id && profile.is_primary
+  );
+  if (ownPrimaryProfile?.profile_type === "lead") {
+    try {
+      await cloud.syncTeamParticipantProfiles();
+    } catch (error) {
+      console.warn("Teamprofile konnten nicht abgeglichen werden:", error);
+    }
+  }
+  const manageableProfiles = ownedTippingProfiles(cloud);
+  cloud.setManageableProfileIds(manageableProfiles.map((profile) => profile.id));
   savedTips = cloudTips;
   teamScoreSummary = cloudTeamScores;
   leaguePredictions = allTips;
@@ -2338,6 +2610,9 @@ async function syncFromCloud() {
   profileStandings = standings;
   pointDetails = details;
   scorerTotals = loadedScorerTotals;
+  participantInvites = Object.fromEntries(loadedParticipantInvites.map((invite) => [
+    invite.display_name.trim().toLowerCase(), invite
+  ]));
   if (cloud.activeProfile?.display_name) {
     leaguePredictions[cloud.activeProfile.display_name] ||= {};
     Object.entries(cloudTips).forEach(([matchId, tip]) => {
@@ -2562,6 +2837,7 @@ document.querySelector("#sign-out").addEventListener("click", async () => {
   document.querySelector("#account-modal").hidden = true;
 });
 window.addEventListener("tippradar-auth-change", async () => {
+  await window.TippRadarCloud?.refreshSessionContext();
   updateAccountUi();
   await syncFromCloud();
 });

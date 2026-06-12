@@ -13,8 +13,23 @@ Im SQL Editor nacheinander vollstaendig ausfuehren:
 7. `07-migration-strict-profile-access.sql`
 8. `08-migration-scoring-start-ledger.sql`
 9. `migration-youth-access.sql`
+10. `migration-team-lead-delegation.sql`
+11. `migration-participant-email-invites.sql`
 
 `Success. No rows returned` ist jeweils die erwartete Rueckmeldung.
+
+Die letzte Migration erlaubt einem Family-Team-Lead, fuer das gesamte eigene
+Team zu tippen. Fehlende Teamprofile werden beim naechsten Laden automatisch
+angelegt und koennen spaeter von Erwachsenen oder Jugendlichen mit eigenem
+Zugang uebernommen werden. Der Team-Lead kann bei Erwachsenen und Jugendlichen
+nur noch leere Tipps erfassen. Bereits gespeicherte Tipps koennen ausschliesslich
+vom jeweiligen eigenen Zugang geaendert werden.
+
+Mit der letzten Migration kann der Organisator unter `Teams & Spieler` fuer
+Team-Leads, Erwachsene und Jugendliche eine E-Mail-Adresse hinterlegen und
+direkt einen persoenlichen Anmeldelink senden. Nach dem Klick wird der Zugang
+automatisch dem vorbereiteten Profil zugeordnet. Kinder benoetigen weiterhin
+keine eigene E-Mail-Adresse.
 
 ## 2. Web-App aktualisieren
 
@@ -33,7 +48,11 @@ Die Vercel-Variablen `API_FOOTBALL_KEY` und `API_FOOTBALL_SYNC_TOKEN` bleiben un
 
 ## 4. Erwachsene einladen
 
-Den Erwachsenen schicken:
+Bevorzugt direkt unter `Teams & Spieler` die E-Mail-Adresse eintragen und
+`Einladen` anklicken. Name, Team und Rolle sind dann nach dem Klick auf den
+Anmeldelink automatisch zugeordnet.
+
+Alternativ den Erwachsenen schicken:
 
 - Adresse: `https://tippradar26.vercel.app`
 - Einladungscode aus dem Kontofenster

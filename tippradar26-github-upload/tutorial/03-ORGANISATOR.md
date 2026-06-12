@@ -12,7 +12,9 @@
 8. Unter `Rang & Form` die Punkte je Spiel fuer Teilnehmer und Teams kontrollieren.
 3. Gewichtungen kontrollieren.
 4. Punkte- und Teamregeln speichern.
-5. Einladungscode aus dem Kontofenster notieren.
+5. Bei Team-Leads, Erwachsenen und Jugendlichen die E-Mail-Adresse eintragen und
+   direkt auf `Einladen` klicken.
+6. Den allgemeinen Einladungscode nur als Ausweichmoeglichkeit notieren.
 
 ## Im Turnier
 

@@ -316,13 +316,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .tip-profile-bar label { display: grid; gap: 5px; }
 .tip-profile-bar label span { color: #63704a; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .tip-profile-bar select { width: 100%; height: 44px; padding: 0 12px; border: 1px solid #cbd9a8; border-radius: 10px; color: var(--ink); background: white; font: 700 13px "Manrope"; }
+.delegated-tip-locked .score-inputs { opacity: .58; }
+.delegated-label { background: #eef2e8; color: #586354; }
 .data-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 15px; padding: 6px 9px; border-radius: 20px; color: var(--muted); background: #eceee9; font-size: 10px; font-weight: 700; }
 .data-status i { width: 6px; height: 6px; border-radius: 50%; background: #a1aaa5; }
 .data-status.connected { color: #3c6e4e; background: #e3f3e8; }
 .data-status.connected i { background: #4da56c; box-shadow: 0 0 0 4px rgba(77,165,108,.12); }
 .data-status.fallback { color: #8b6242; background: #f5e9dc; }
 .data-status.fallback i { background: #c58a5c; }
-.date-tabs { display: flex; gap: 10px; padding: 24px 0; overflow-x: auto; }
+.date-tabs { display: grid; gap: 14px; padding: 24px 0; }
+.tip-stage { display: grid; gap: 7px; }
+.tip-stage > strong { color: #647067; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.tip-stage > div { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
 .match-view-note { margin: -14px 0 20px; color: var(--muted); font-size: 11px; }
 .date-tab {
   min-width: 145px; border: 1px solid var(--line); background: var(--paper); border-radius: 13px; padding: 13px 15px;
@@ -336,6 +341,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .date-tab.active small { border-color: #42504b; }
 
 .matches { display: grid; gap: 13px; }
+.projection-hint { padding: 4px 6px; border-radius: 6px; color: #5f6d51; background: var(--lime-soft); font-size: 8px; font-weight: 700; }
 .matches-empty {
   display: grid;
   gap: 6px;
@@ -849,7 +855,12 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .player-form[hidden] { display: none; }
 .player-form input, .player-form select { min-width: 0; height: 39px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: white; }
 .player-form button { border: 0; border-radius: 8px; padding: 0 12px; color: var(--ink); background: var(--lime); font-weight: 800; cursor: pointer; }
-.team-members > .member-admin { grid-template-columns: 24px 35px 1fr 160px 30px; min-height: 68px; opacity: 1; background: transparent; }
+.team-members > .member-admin { grid-template-columns: 24px 35px minmax(120px, 1fr) minmax(185px, 1.15fr) 145px 30px; min-height: 76px; opacity: 1; background: transparent; }
+.member-invite { display: grid; grid-template-columns: minmax(105px, 1fr) auto; gap: 4px; }
+.member-invite input { min-width: 0; height: 30px; padding: 0 8px; border: 1px solid #d7ddd6; border-radius: 7px; font-size: 9px; }
+.member-invite button { min-height: 30px; padding: 0 8px; border: 0; border-radius: 7px; color: var(--ink); background: var(--lime); font-size: 8px; font-weight: 800; cursor: pointer; }
+.member-invite button:disabled { color: #53635a; background: #e6ebe5; cursor: default; }
+.member-invite small { grid-column: 1 / -1; color: var(--muted); font-size: 7px; }
 .weight-control { display: grid; grid-template-columns: 1fr; gap: 5px; }
 .weight-control span { display: flex; justify-content: space-between; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
 .weight-control b { color: var(--ink); font-size: 10px; }
@@ -953,6 +964,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
   .rules-footer { align-items: stretch; flex-direction: column; gap: 15px; }
   .team-members > div { padding-left: 10px; padding-right: 10px; }
   .team-members > .member-admin { grid-template-columns: 20px 32px 1fr 28px; }
+  .member-admin .member-invite { grid-column: 2 / 4; }
   .team-head-right { align-items: end; flex-direction: column; gap: 6px; }
   .member-admin .weight-control { grid-column: 2 / 4; }
   .member-admin .member-delete { grid-column: 4; grid-row: 1; }
