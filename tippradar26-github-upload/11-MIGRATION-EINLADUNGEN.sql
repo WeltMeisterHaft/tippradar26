@@ -1,5 +1,12 @@
 -- TippRadar26: Organisator-Einladungen per E-Mail mit automatischer Profilzuordnung.
 
+alter table public.participant_profiles
+  drop constraint if exists participant_profiles_profile_type_check;
+
+alter table public.participant_profiles
+  add constraint participant_profiles_profile_type_check
+  check (profile_type in ('lead', 'adult', 'youth', 'child'));
+
 create table if not exists public.participant_invites (
   id uuid primary key default gen_random_uuid(),
   league_id uuid not null references public.leagues(id) on delete cascade,
@@ -13,6 +20,7 @@ create table if not exists public.participant_invites (
 alter table public.participant_invites enable row level security;
 
 drop function if exists public.set_participant_invite(text, text);
+drop function if exists public.set_participant_invite(text, text, text);
 
 create or replace function public.set_participant_invite(
   target_name text,
