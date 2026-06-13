@@ -161,25 +161,26 @@
     if (!league || league.role !== "organizer") {
       throw new Error("Nur der Organisator darf Einladungen versenden.");
     }
-    const { error: inviteError } = await client.rpc("set_participant_invite", {
-      target_name: displayName,
-      target_email: email
+    const { data: sessionData } = await client.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) throw new Error("Bitte einmal abmelden und neu anmelden.");
+    const result = await fetch("/api/invite", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        displayName,
+        email,
+        redirectTo: window.location.origin + window.location.pathname
+      })
     });
-    if (inviteError) throw inviteError;
-    const { error: mailError } = await client.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin + window.location.pathname,
-        shouldCreateUser: true
-      }
-    });
-    const invites = await loadParticipantInvites();
-    if (mailError) {
-      const error = new Error(mailError.message || "Der Anmeldelink konnte nicht versendet werden.");
-      error.inviteSaved = true;
-      throw error;
+    const body = await result.json().catch(() => ({}));
+    if (!result.ok) {
+      throw new Error(body.error || "Der Anmeldelink konnte nicht versendet werden.");
     }
-    return invites;
+    return loadParticipantInvites();
   }
 
   async function signOut() {

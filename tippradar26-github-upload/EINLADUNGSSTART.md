@@ -15,6 +15,7 @@ Im SQL Editor nacheinander vollstaendig ausfuehren:
 9. `migration-youth-access.sql`
 10. `migration-team-lead-delegation.sql`
 11. `migration-participant-email-invites.sql`
+12. `migration-exclusive-scoring.sql`
 
 `Success. No rows returned` ist jeweils die erwartete Rueckmeldung.
 
@@ -34,6 +35,12 @@ Team-Leads, Erwachsene und Jugendliche eine E-Mail-Adresse hinterlegen und
 direkt einen persoenlichen Anmeldelink senden. Nach dem Klick wird der Zugang
 automatisch dem vorbereiteten Profil zugeordnet. Kinder benoetigen weiterhin
 keine eigene E-Mail-Adresse.
+
+Fuer den sicheren Versand aus der App muss in Vercel zusaetzlich die geheime
+Supabase-Variable `SUPABASE_SECRET_KEY` hinterlegt werden. Der Wert steht im
+Supabase-Dashboard unter `Settings` -> `API Keys` bei `Secret key`. Danach ist
+ein neues Vercel-Deployment erforderlich. Der Schluessel darf niemals in
+GitHub oder in `config.js` eingetragen werden.
 
 Wird ein bisheriges Kinderprofil spaeter auf `Jugend` oder `Erwachsen`
 umgestellt, kann es anschliessend ebenfalls eingeladen werden. Vorhandene Tipps

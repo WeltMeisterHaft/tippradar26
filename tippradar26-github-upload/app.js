@@ -78,6 +78,7 @@ let scoringStart = null;
 let pointDetails = null;
 let scorerTotals = {};
 let participantInvites = {};
+let participantInviteStatus = {};
 let internationalStats = (() => {
   try {
     return JSON.parse(localStorage.getItem(internationalStatsStorageKey) || "[]");
@@ -1741,11 +1742,14 @@ function renderTeams() {
               ${canManageTeams && !member.bot && participantRole(member) !== "child" ? (() => {
                 const linkedProfile = profileForName(member.name);
                 const invite = participantInvites[member.name.trim().toLowerCase()];
+                const inviteStatus = participantInviteStatus[member.name.trim().toLowerCase()];
                 const linked = Boolean(linkedProfile?.account_user_id);
                 return `<div class="member-invite ${linked ? "linked" : ""}">
                   <input type="email" data-field="invite-email" value="${escapeHtml(invite?.email || "")}" placeholder="E-Mail-Adresse" ${linked ? "disabled" : ""}>
                   <button data-action="invite-player" ${linked ? "disabled" : ""}>${linked ? "Zugang aktiv" : (invite ? "Erneut senden" : "Einladen")}</button>
-                  ${invite && !linked ? `<small>Versendet ${new Intl.DateTimeFormat("de-DE").format(new Date(invite.invited_at))}</small>` : ""}
+                  ${inviteStatus
+                    ? `<small class="${inviteStatus.type}">${escapeHtml(inviteStatus.text)}</small>`
+                    : (invite && !linked ? `<small>Versendet ${new Intl.DateTimeFormat("de-DE").format(new Date(invite.invited_at))}</small>` : "")}
                 </div>`;
               })() : ""}
               <label class="weight-control">
@@ -1829,14 +1833,22 @@ function renderRules() {
   if (!container) return;
   const cloudConnected = Boolean(window.TippRadarCloud?.league);
   const isOrganizer = !cloudConnected || window.TippRadarCloud.league.role === "organizer";
-  container.innerHTML = scoringRules.map((rule) => `
+  container.innerHTML = scoringRules.map((rule) => {
+    const hierarchyLabel = ({
+      exact: "1. Priorität",
+      goal_difference: "2. Priorität",
+      tendency: "3. Priorität",
+      total_goals: "4. Priorität"
+    })[rule.criterion];
+    return `
     <label data-rule-id="${rule.id}">
-      <span><i class="rule-dot ${rule.teamRule ? "team-bonus" : rule.id}"></i>${escapeHtml(rule.name)}${rule.teamRule ? "<small class=\"team-rule-label\">TEAM-BONUS</small>" : ""}</span>
+      <span><i class="rule-dot ${rule.teamRule ? "team-bonus" : rule.id}"></i>${escapeHtml(rule.name)}${rule.teamRule ? "<small class=\"team-rule-label\">TEAM-BONUS</small>" : ""}${hierarchyLabel ? `<small class="priority-rule-label">${hierarchyLabel}</small>` : ""}</span>
       <input type="number" min="0" max="10" value="${rule.points}" data-action="rule-points" ${isOrganizer ? "" : "disabled"}>
       <small>Punkte</small>
       ${rule.locked || !isOrganizer ? "" : `<button class="rule-delete" data-action="delete-rule" aria-label="Kategorie l&ouml;schen">&times;</button>`}
-    </label>`).join("");
-  const total = scoringRules.filter((rule) => !rule.teamRule).reduce((sum, rule) => sum + Number(rule.points), 0);
+    </label>`;
+  }).join("");
+  const total = Math.max(0, ...scoringRules.filter((rule) => !rule.teamRule).map((rule) => Number(rule.points)));
   document.querySelector("#rule-count").textContent = `${scoringRules.length} Kategorien`;
   document.querySelector("#rule-total").textContent = `${total} Punkte`;
   document.querySelector("#save-rules").hidden = !isOrganizer;
@@ -1957,29 +1969,22 @@ function renderPointDetails() {
     const [actualHome, actualAway] = result.split(":").map(Number);
     const tipHome = Number(tip.home_score);
     const tipAway = Number(tip.away_score);
-    const baseRules = scoringRules.filter((rule) =>
-      ["exact", "difference", "tendency", "wrong"].includes(rule.id)
-    );
-    const baseMatches = baseRules.map((rule) => {
+    const priorities = {
+      exact: 1, goal_difference: 2, tendency: 3, total_goals: 4,
+      home_goals: 5, away_goals: 6
+    };
+    const matches = scoringRules.filter((rule) => !rule.teamRule).map((rule) => {
       let matched = false;
-      if (rule.id === "exact") matched = tipHome === actualHome && tipAway === actualAway;
-      if (rule.id === "difference") matched = tipHome - tipAway === actualHome - actualAway;
-      if (rule.id === "tendency") matched = Math.sign(tipHome - tipAway) === Math.sign(actualHome - actualAway);
-      if (rule.id === "wrong") matched = true;
-      return { name: rule.name, points: matched ? Number(rule.points || 0) : 0 };
-    }).filter((item) => item.points > 0);
-    const bestBase = baseMatches.sort((a, b) => b.points - a.points)[0];
-    const extras = scoringRules
-      .filter((rule) => !rule.teamRule && !["exact", "difference", "tendency", "wrong"].includes(rule.id))
-      .map((rule) => {
-        let matched = false;
-        if (rule.criterion === "goal_difference") matched = tipHome - tipAway === actualHome - actualAway;
-        if (rule.criterion === "total_goals") matched = tipHome + tipAway === actualHome + actualAway;
-        if (rule.criterion === "home_goals") matched = tipHome === actualHome;
-        if (rule.criterion === "away_goals") matched = tipAway === actualAway;
-        return { name: rule.name, points: matched ? Number(rule.points || 0) : 0 };
-      }).filter((item) => item.points > 0);
-    return [...(bestBase ? [bestBase] : []), ...extras];
+      if (rule.criterion === "exact") matched = tipHome === actualHome && tipAway === actualAway;
+      if (rule.criterion === "goal_difference") matched = tipHome - tipAway === actualHome - actualAway;
+      if (rule.criterion === "tendency") matched = Math.sign(tipHome - tipAway) === Math.sign(actualHome - actualAway);
+      if (rule.criterion === "total_goals") matched = tipHome + tipAway === actualHome + actualAway;
+      if (rule.criterion === "home_goals") matched = tipHome === actualHome;
+      if (rule.criterion === "away_goals") matched = tipAway === actualAway;
+      return { name: rule.name, points: Number(rule.points || 0), priority: priorities[rule.criterion] || 99, matched };
+    }).filter((item) => item.matched && item.points > 0)
+      .sort((a, b) => a.priority - b.priority || b.points - a.points);
+    return matches.length ? [{ name: matches[0].name, points: matches[0].points }] : [];
   }
 
   function matchBreakdown(match) {
@@ -2288,25 +2293,25 @@ document.querySelector("#team-grid").addEventListener("click", async (event) => 
     }
     actionButton.disabled = true;
     actionButton.textContent = "Wird gesendet";
+    const inviteKey = member.name.trim().toLowerCase();
+    participantInviteStatus[inviteKey] = { type: "pending", text: "Einladung wird versendet ..." };
     try {
       const invites = await window.TippRadarCloud.inviteParticipant(member.name, email);
       participantInvites = Object.fromEntries(invites.map((invite) => [
         invite.display_name.trim().toLowerCase(), invite
       ]));
+      participantInviteStatus[inviteKey] = { type: "success", text: `Anmeldelink an ${email} versendet.` };
       renderTeams();
       showToast("Einladung gesendet", `${member.name} erhält jetzt einen persönlichen Anmeldelink.`);
     } catch (error) {
-      try {
-        const invites = await window.TippRadarCloud.loadParticipantInvites();
-        participantInvites = Object.fromEntries(invites.map((invite) => [
-          invite.display_name.trim().toLowerCase(), invite
-        ]));
-      } catch {}
+      participantInvites[inviteKey] = {
+        ...(participantInvites[inviteKey] || {}),
+        display_name: member.name,
+        email
+      };
+      participantInviteStatus[inviteKey] = { type: "error", text: error.message };
       renderTeams();
-      showToast(
-        error.inviteSaved ? "E-Mail gespeichert, Versand offen" : "Einladung nicht gesendet",
-        error.message
-      );
+      showToast("Einladung nicht gesendet", error.message);
     }
   }
   if (action === "rename-player") {
