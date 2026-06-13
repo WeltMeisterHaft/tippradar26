@@ -2296,7 +2296,11 @@ document.querySelector("#team-grid").addEventListener("click", async (event) => 
     const inviteKey = member.name.trim().toLowerCase();
     participantInviteStatus[inviteKey] = { type: "pending", text: "Einladung wird versendet ..." };
     try {
-      const invites = await window.TippRadarCloud.inviteParticipant(member.name, email);
+      const invites = await window.TippRadarCloud.inviteParticipant(
+        member.name,
+        email,
+        participantRole(member)
+      );
       participantInvites = Object.fromEntries(invites.map((invite) => [
         invite.display_name.trim().toLowerCase(), invite
       ]));

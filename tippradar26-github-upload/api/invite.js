@@ -39,9 +39,10 @@ module.exports = async function handler(request, response) {
   const userToken = String(request.headers.authorization || "").replace(/^Bearer\s+/i, "");
   const displayName = String(request.body?.displayName || "").trim();
   const email = String(request.body?.email || "").trim().toLowerCase();
+  const role = String(request.body?.role || "").trim().toLowerCase();
   const redirectTo = String(request.body?.redirectTo || "").trim();
 
-  if (!userToken || !displayName || !email || !redirectTo) {
+  if (!userToken || !displayName || !email || !role || !redirectTo) {
     send(response, 400, { ok: false, error: "Name, E-Mail und Anmeldung werden benötigt." });
     return;
   }
@@ -61,7 +62,7 @@ module.exports = async function handler(request, response) {
         Authorization: `Bearer ${userToken}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ target_name: displayName, target_email: email })
+      body: JSON.stringify({ target_name: displayName, target_email: email, target_role: role })
     });
 
     try {

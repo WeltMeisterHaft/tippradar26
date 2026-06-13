@@ -12,9 +12,12 @@ create table if not exists public.participant_invites (
 
 alter table public.participant_invites enable row level security;
 
+drop function if exists public.set_participant_invite(text, text);
+
 create or replace function public.set_participant_invite(
   target_name text,
-  target_email text
+  target_email text,
+  target_role text
 )
 returns uuid
 language plpgsql
@@ -43,18 +46,22 @@ begin
     raise exception 'Bitte eine gueltige E-Mail-Adresse eingeben';
   end if;
 
-  select coalesce(member->>'role', 'adult')
-  into prepared_role
-  from public.league_state state
-  cross join lateral jsonb_array_elements(state.teams) team
-  cross join lateral jsonb_array_elements(team->'members') member
-  where state.league_id = target_league
-    and lower(trim(member->>'name')) = lower(trim(target_name))
-    and not coalesce((member->>'bot')::boolean, false)
-  limit 1;
+  prepared_role := lower(trim(target_role));
 
   if prepared_role not in ('lead', 'adult', 'youth') then
     raise exception 'Nur Team-Leads, Erwachsene und Jugendliche erhalten einen eigenen Zugang';
+  end if;
+
+  if not exists (
+    select 1
+    from public.league_state state
+    cross join lateral jsonb_array_elements(state.teams) team
+    cross join lateral jsonb_array_elements(team->'members') member
+    where state.league_id = target_league
+      and lower(trim(member->>'name')) = lower(trim(target_name))
+      and not coalesce((member->>'bot')::boolean, false)
+  ) then
+    raise exception 'Dieser Teilnehmer ist keinem Team zugeordnet';
   end if;
 
   select id, account_user_id, is_primary
@@ -83,6 +90,10 @@ begin
     set account_user_id = null
     where id = target_profile;
   end if;
+
+  update public.participant_profiles
+  set profile_type = prepared_role
+  where id = target_profile;
 
   insert into public.participant_invites(
     league_id, profile_id, email, invited_at, claimed_at
@@ -185,6 +196,6 @@ begin
 end
 $$;
 
-grant execute on function public.set_participant_invite(text, text) to authenticated;
+grant execute on function public.set_participant_invite(text, text, text) to authenticated;
 grant execute on function public.list_participant_invites() to authenticated;
 grant execute on function public.claim_participant_invite() to authenticated;

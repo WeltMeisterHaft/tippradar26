@@ -157,7 +157,7 @@
     return data || [];
   }
 
-  async function inviteParticipant(displayName, email) {
+  async function inviteParticipant(displayName, email, role) {
     if (!league || league.role !== "organizer") {
       throw new Error("Nur der Organisator darf Einladungen versenden.");
     }
@@ -173,6 +173,7 @@
       body: JSON.stringify({
         displayName,
         email,
+        role,
         redirectTo: window.location.origin + window.location.pathname
       })
     });
