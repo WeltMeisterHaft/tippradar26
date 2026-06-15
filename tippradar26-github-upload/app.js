@@ -126,6 +126,27 @@ function formatMatchTime(value) {
   }).format(date).replace(",", " /");
 }
 
+function scoringDayKey(value) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Europe/Berlin"
+  }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function scoringDayLabel(value) {
+  return new Intl.DateTimeFormat("de-DE", {
+    weekday: "long", day: "2-digit", month: "long", timeZone: "Europe/Berlin"
+  }).format(new Date(value));
+}
+
+function assignScoringDays(schedule) {
+  return schedule.map((match) => ({
+    ...match,
+    matchday: scoringDayKey(match.kickoff)
+  }));
+}
+
 function normalizeOpenLigaMatch(apiMatch) {
   const finalResult = (apiMatch.matchResults || []).find((result) => result.resultTypeID === 2);
   return {
@@ -264,10 +285,10 @@ async function loadOpenLigaMatches() {
     const response = await fetch("https://api.openligadb.de/getmatchdata/wm26/2026");
     if (!response.ok) throw new Error(`OpenLigaDB ${response.status}`);
     const data = await response.json();
-    const normalized = assignKnockoutProjectionIds(assignGroupLetters(data
+    const normalized = assignScoringDays(assignKnockoutProjectionIds(assignGroupLetters(data
       .filter((match) => match.team1 && match.team2)
       .sort((a, b) => new Date(a.matchDateTime) - new Date(b.matchDateTime))
-      .map(normalizeOpenLigaMatch)));
+      .map(normalizeOpenLigaMatch))));
     if (!normalized.length) throw new Error("Keine WM-Spiele gefunden");
     tournamentSchedule = normalized;
     localStorage.setItem(scheduleStorageKey, JSON.stringify(normalized));
@@ -477,7 +498,7 @@ const worldCupGroupDisplay = {
   K: ["Portugal", "DR Kongo", "Usbekistan", "Kolumbien"],
   L: ["England", "Kroatien", "Ghana", "Panama"]
 };
-tournamentSchedule = assignGroupLetters(tournamentSchedule);
+tournamentSchedule = assignScoringDays(assignGroupLetters(tournamentSchedule));
 
 function sameNationalTeam(first, second) {
   return canonicalNationalTeam(first) === canonicalNationalTeam(second);
@@ -2031,8 +2052,13 @@ function renderPointDetails() {
   }
 
   const matchesByDay = Object.values(rows.reduce((groups, match) => {
-    const key = String(match.matchday);
-    groups[key] ||= { matchday: key, matches: [], latest: 0 };
+    const key = scoringDayKey(match.kickoff);
+    groups[key] ||= {
+      matchday: key,
+      label: scoringDayLabel(match.kickoff),
+      matches: [],
+      latest: 0
+    };
     const breakdown = matchBreakdown(match);
     groups[key].matches.push(breakdown);
     groups[key].latest = Math.max(groups[key].latest, new Date(match.kickoff).getTime());
@@ -2062,7 +2088,7 @@ function renderPointDetails() {
       return `
         <details class="ledger-day" ${dayIndex === 0 ? "open" : ""}>
           <summary class="ledger-table ledger-day-row">
-            <span><i></i><strong>Spieltag ${escapeHtml(day.matchday)}</strong><small>${day.matches.length} Spiele</small></span>
+            <span><i></i><strong>${escapeHtml(day.label)}</strong><small>${day.matches.length} Spiele</small></span>
             <span>${totals.tips}</span><span>${totals.top5}</span><span>${totals.teamBase.toFixed(1)}</span>
             <span>+${totals.bonus.toFixed(1)}</span><strong>+${dayBonus.toFixed(1)}</strong>
           </summary>
@@ -2685,9 +2711,28 @@ document.querySelector("#send-magic-link").addEventListener("click", async () =>
   if (!email) return showToast("E-Mail fehlt", "Bitte gib deine E-Mail-Adresse ein.");
   try {
     await window.TippRadarCloud.sendMagicLink(email);
-    showToast("E-Mail ist unterwegs", "Bitte den Anmeldelink im Postfach anklicken.");
+    localStorage.setItem("tippradar26-login-email", email);
+    document.querySelector("#login-code-panel").hidden = false;
+    document.querySelector("#login-code").focus();
+    showToast("E-Mail ist unterwegs", "Anmeldelink anklicken oder den sechsstelligen Code eingeben.");
   } catch (error) {
     showToast("Anmeldung fehlgeschlagen", error.message);
+  }
+});
+document.querySelector("#verify-login-code").addEventListener("click", async () => {
+  const email = document.querySelector("#login-email").value.trim();
+  const code = document.querySelector("#login-code").value.replace(/\D/g, "");
+  if (!email || code.length !== 6) {
+    return showToast("Code fehlt", "Bitte E-Mail-Adresse und sechsstelligen Code eingeben.");
+  }
+  try {
+    await window.TippRadarCloud.verifyEmailCode(email, code);
+    updateAccountUi();
+    await syncFromCloud();
+    document.querySelector("#account-modal").hidden = true;
+    showToast("Willkommen zur\u00fcck", "Dieser Browser merkt sich deine Anmeldung.");
+  } catch (error) {
+    showToast("Code nicht g\u00fcltig", error.message);
   }
 });
 document.querySelector("#join-league").addEventListener("click", async () => {
@@ -2885,4 +2930,5 @@ ensureInternationalStats();
 renderScorerMatches();
 updateCountdown();
 loadOpenLigaMatches();
+document.querySelector("#login-email").value = localStorage.getItem("tippradar26-login-email") || "";
 initializeCloud();

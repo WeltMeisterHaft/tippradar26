@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260613-r29">
+  <link rel="stylesheet" href="styles.css?v=20260615-r31">
 </head>
 <body>
   <div class="app-shell">
@@ -323,7 +323,7 @@
         </section>
       </section>
     </main>
-    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.13-R29 &middot; Berlin</span></footer>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.15-R31 &middot; Berlin</span></footer>
 
     <nav class="mobile-nav" aria-label="Mobile Navigation">
       <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
@@ -344,9 +344,15 @@
         <div id="cloud-login" hidden>
           <span class="section-kicker">Ohne Passwort</span>
           <h2>Per E-Mail anmelden</h2>
-          <p>Wir schicken dir einen einmaligen Anmeldelink.</p>
+          <p>Wir schicken dir einen einmaligen Anmeldelink und Anmeldecode. Danach bleibt dieser Browser angemeldet.</p>
           <label class="account-field"><span>E-Mail-Adresse</span><input id="login-email" type="email" placeholder="name@beispiel.de"></label>
           <button class="primary-button full-button" id="send-magic-link">Anmeldelink senden</button>
+          <div class="login-code-panel" id="login-code-panel" hidden>
+            <div class="login-divider"><span>oder mit Code</span></div>
+            <label class="account-field"><span>Sechsstelliger Anmeldecode</span><input id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>
+            <button class="secondary-button full-button" id="verify-login-code">Code best&auml;tigen</button>
+            <p class="login-code-note">Der Code ist zuverl&auml;ssiger, falls Outlook den Anmeldelink vorab sicherheitspr&uuml;ft.</p>
+          </div>
         </div>
         <div id="cloud-onboarding" hidden>
           <span class="section-kicker">Willkommen</span>
@@ -382,8 +388,8 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260613-r29"></script>
-  <script src="cloud.js?v=20260613-r29"></script>
-  <script src="app.js?v=20260613-r29"></script>
+  <script src="config.js?v=20260615-r31"></script>
+  <script src="cloud.js?v=20260615-r31"></script>
+  <script src="app.js?v=20260615-r31"></script>
 </body>
 </html>

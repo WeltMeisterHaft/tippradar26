@@ -1,7 +1,14 @@
 (function () {
   const config = window.TIPPRADAR_CONFIG || {};
   const configured = Boolean(config.supabaseUrl && config.supabaseKey && window.supabase);
-  const client = configured ? window.supabase.createClient(config.supabaseUrl, config.supabaseKey) : null;
+  const client = configured ? window.supabase.createClient(config.supabaseUrl, config.supabaseKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage
+    }
+  }) : null;
   let session = null;
   let league = null;
   let profiles = [];
@@ -132,9 +139,28 @@
     if (!client) throw new Error("Supabase ist noch nicht eingerichtet.");
     const { error } = await client.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+      options: {
+        emailRedirectTo: window.location.origin + window.location.pathname,
+        shouldCreateUser: false
+      }
     });
     if (error) throw error;
+  }
+
+  async function verifyEmailCode(email, token) {
+    if (!client) throw new Error("Supabase ist noch nicht eingerichtet.");
+    const { data, error } = await client.auth.verifyOtp({
+      email,
+      token,
+      type: "email"
+    });
+    if (error) throw error;
+    session = data.session;
+    if (session) {
+      await claimParticipantInvite();
+      await loadMembership();
+    }
+    return session;
   }
 
   async function claimParticipantInvite() {
@@ -335,13 +361,19 @@
 
   async function loadTeamScores() {
     if (!league) return {};
-    const [{ data: matchScores, error: matchError }, { data: dayScores, error: dayError }] = await Promise.all([
+    const [
+      { data: matchScores, error: matchError },
+      { data: dayScores, error: dayError },
+      { data: schedule, error: scheduleError }
+    ] = await Promise.all([
       client.from("team_match_scores").select("team_id, match_id, match_bonus").eq("league_id", league.id),
-      client.from("team_matchday_bonuses").select("team_id, matchday, weighted_points, bonus_points").eq("league_id", league.id)
+      client.from("team_matchday_bonuses").select("team_id, matchday, weighted_points, bonus_points").eq("league_id", league.id),
+      client.from("match_schedule").select("matchday").eq("league_id", league.id)
     ]);
-    if (matchError || dayError) return {};
+    if (matchError || dayError || scheduleError) return {};
+    const activeMatchdays = new Set((schedule || []).map((row) => String(row.matchday)));
     const summary = {};
-    (dayScores || []).forEach((row) => {
+    (dayScores || []).filter((row) => activeMatchdays.has(String(row.matchday))).forEach((row) => {
       summary[row.team_id] ||= { base: 0, matchBonus: 0, matchdayBonus: 0, matchWins: 0, matchdayWins: 0 };
       summary[row.team_id].base += Number(row.weighted_points || 0);
       summary[row.team_id].matchdayBonus += Number(row.bonus_points || 0);
@@ -578,7 +610,7 @@
   }
 
   window.TippRadarCloud = {
-    init, sendMagicLink, claimParticipantInvite, refreshSessionContext,
+    init, sendMagicLink, verifyEmailCode, claimParticipantInvite, refreshSessionContext,
     loadParticipantInvites, inviteParticipant, signOut, createLeague, joinLeague, ensurePrimaryProfile,
     loadProfiles, selectProfile, setManageableProfileIds, syncCurrentParticipantRole, syncTeamParticipantProfiles,
     addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,

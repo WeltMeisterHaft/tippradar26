@@ -582,6 +582,12 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .account-field span { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .account-field input, .account-field select, .onboarding-options input { height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: white; }
 .full-button { width: 100%; margin-top: 14px; }
+.login-code-panel { margin-top: 18px; }
+.login-code-panel[hidden] { display: none; }
+.login-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.login-divider::before, .login-divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+.login-code-panel .account-field { margin-top: 14px; }
+.login-code-note { margin: 10px 0 0; font-size: 11px; }
 .onboarding-options { display: grid; gap: 12px; margin-top: 18px; }
 .onboarding-options > div { display: grid; gap: 8px; padding: 15px; border: 1px solid var(--line); border-radius: 13px; }
 .onboarding-options button { min-height: 40px; border: 0; border-radius: 8px; background: var(--ink); color: white; font-weight: 700; cursor: pointer; }
