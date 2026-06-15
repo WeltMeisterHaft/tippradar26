@@ -71,6 +71,7 @@ const internationalStatsStorageKey = "tippradar26-international-stats-v2";
 let savedTips = JSON.parse(localStorage.getItem(storageKey) || "{}");
 let selectedSeries = null;
 let selectedParticipant = "all";
+let selectedLedgerFilter = "all";
 let teamScoreSummary = {};
 let leaguePredictions = {};
 let fantasyPicks = [];
@@ -2003,6 +2004,7 @@ function renderRanking() {
 function renderPointDetails() {
   const list = document.querySelector("#points-ledger-list");
   const startLabel = document.querySelector("#ledger-scoring-start");
+  const filter = document.querySelector("#ledger-filter");
   if (!list || !startLabel) return;
   startLabel.textContent = formatScoringStart(scoringStart);
   const details = pointDetails || {
@@ -2020,6 +2022,9 @@ function renderPointDetails() {
   }));
 
   const profileNames = Object.fromEntries(details.profiles.map((profile) => [profile.id, profile.display_name]));
+  const teamForName = (name) => teams.find((team) => team.members.some((member) =>
+    normalizedTeamName(member.name) === normalizedTeamName(name)
+  ))?.id || null;
   const fantasyByKey = Object.fromEntries(details.fantasy.map((row) => [
     `${row.profile_id}:${row.match_id}`, {
       goals: Number(row.goal_points || 0),
@@ -2028,6 +2033,59 @@ function renderPointDetails() {
     }
   ]));
   const teamNames = Object.fromEntries(teams.map((team) => [team.id, team.name]));
+  if (filter) {
+    const profileOptions = details.profiles.map((profile) => ({
+      id: String(profile.id),
+      name: profile.display_name,
+      automatic: profile.auto_strategy && profile.auto_strategy !== "manual",
+      teamId: teamForName(profile.display_name)
+    }));
+    const botOptions = teams.flatMap((team) => team.members.filter((member) => member.bot).map((member) => ({
+      id: String(member.id),
+      name: member.name,
+      automatic: true,
+      teamId: team.id
+    })));
+    const participants = [...new Map([...profileOptions, ...botOptions]
+      .map((participant) => [participant.id, participant])).values()]
+      .sort((a, b) => a.name.localeCompare(b.name, "de"));
+    const validValues = new Set([
+      "all",
+      ...participants.map((participant) => `participant:${participant.id}`),
+      "model:dog", "model:rank", "model:stat", "model:dna",
+      ...teams.map((team) => `team:${team.id}`)
+    ]);
+    if (!validValues.has(selectedLedgerFilter)) selectedLedgerFilter = "all";
+    filter.innerHTML = `
+      <option value="all">Alle Teilnehmer &amp; Teams</option>
+      <optgroup label="Teilnehmer">
+        ${participants.map((participant) => `
+          <option value="participant:${escapeHtml(participant.id)}" ${selectedLedgerFilter === `participant:${participant.id}` ? "selected" : ""}>
+            ${escapeHtml(participant.name)}${participant.automatic ? " (Auto)" : ""}${participant.teamId ? ` · ${escapeHtml(teamNames[participant.teamId] || "")}` : ""}
+          </option>
+        `).join("")}
+      </optgroup>
+      <optgroup label="Auto-Tippmodelle">
+        <option value="model:dog" ${selectedLedgerFilter === "model:dog" ? "selected" : ""}>DOG-TIP · Zufall</option>
+        <option value="model:rank" ${selectedLedgerFilter === "model:rank" ? "selected" : ""}>RANK-TIP · FIFA-Rang</option>
+        <option value="model:stat" ${selectedLedgerFilter === "model:stat" ? "selected" : ""}>STAT-TIP · Tormodell</option>
+        <option value="model:dna" ${selectedLedgerFilter === "model:dna" ? "selected" : ""}>DNA-TIP · WM-Erfahrung</option>
+      </optgroup>
+      <optgroup label="Teams">
+        ${teams.map((team) => `
+          <option value="team:${escapeHtml(String(team.id))}" ${selectedLedgerFilter === `team:${team.id}` ? "selected" : ""}>${escapeHtml(team.name)}</option>
+        `).join("")}
+      </optgroup>`;
+  }
+  const selectedParticipantId = selectedLedgerFilter.startsWith("participant:")
+    ? selectedLedgerFilter.slice("participant:".length)
+    : null;
+  const selectedTeamId = selectedLedgerFilter.startsWith("team:")
+    ? selectedLedgerFilter.slice("team:".length)
+    : null;
+  const selectedModel = selectedLedgerFilter.startsWith("model:")
+    ? selectedLedgerFilter.slice("model:".length)
+    : null;
   const evaluatedMatchIds = new Set([
     ...details.profileTips.filter((row) => row.points !== null).map((row) => String(row.match_id)),
     ...details.bots.filter((row) => row.points !== null).map((row) => String(row.match_id)),
@@ -2076,6 +2134,8 @@ function renderPointDetails() {
           ? (fantasyByKey[`${tip.profile_id}:${tip.match_id}`] || { goals: 0, wins: 0, total: 0 })
           : { goals: 0, wins: 0, total: 0 };
         return {
+          filterId: String(tip.profile_id),
+          teamId: teamForName(profileNames[tip.profile_id] || ""),
           name: profileNames[tip.profile_id] || "Unbekannt",
           tip: `${tip.home_score}:${tip.away_score}`,
           tipPoints, top5: fantasy.total, total: tipPoints + fantasy.total,
@@ -2086,15 +2146,44 @@ function renderPointDetails() {
     const botRows = details.bots
       .filter((tip) => String(tip.match_id) === String(match.match_id))
       .map((tip) => ({
+        filterId: String(tip.bot_id),
+        teamId: String(tip.team_id || ""),
         name: `${tip.bot_name} (Auto)`, tip: `${tip.home_score}:${tip.away_score}`,
         tipPoints: counted ? Number(tip.points || 0) : 0, top5: 0,
         total: counted ? Number(tip.points || 0) : 0,
         categories: tipCategoryBreakdown(tip, match.result, counted),
         fantasy: { goals: 0, wins: 0, total: 0 }
       }));
-    const participantRows = [...profileRows, ...botRows].sort((a, b) => b.total - a.total);
+    const officialParticipantRows = [...profileRows, ...botRows]
+      .filter((row) => !selectedParticipantId || row.filterId === selectedParticipantId)
+      .filter((row) => !selectedTeamId || row.teamId === selectedTeamId)
+      .sort((a, b) => b.total - a.total);
+    const modelTip = selectedModel
+      ? botTip({ id: `model-${selectedModel}`, strategy: selectedModel }, {
+          id: match.match_id,
+          home: match.home_team,
+          away: match.away_team
+        })
+      : null;
+    const modelPoints = selectedModel && counted ? pointsForResult(modelTip, match.result) : 0;
+    const participantRows = selectedModel ? [{
+      filterId: `model-${selectedModel}`,
+      teamId: null,
+      name: botStrategyNames[selectedModel] || selectedModel.toUpperCase(),
+      tip: modelTip,
+      tipPoints: modelPoints,
+      top5: 0,
+      total: modelPoints,
+      categories: tipCategoryBreakdown({
+        home_score: Number(modelTip.split(":")[0]),
+        away_score: Number(modelTip.split(":")[1])
+      }, match.result, counted),
+      fantasy: { goals: 0, wins: 0, total: 0 }
+    }] : officialParticipantRows;
     const teamRows = details.teamMatches
       .filter((row) => String(row.match_id) === String(match.match_id))
+      .filter(() => !selectedParticipantId && !selectedModel)
+      .filter((row) => !selectedTeamId || String(row.team_id) === selectedTeamId)
       .map((row) => ({
         name: teamNames[row.team_id] || row.team_id,
         base: counted ? Number(row.weighted_points || 0) : 0,
@@ -2131,6 +2220,8 @@ function renderPointDetails() {
     ${matchesByDay.map((day, dayIndex) => {
       const dayRows = details.teamDays
         .filter((row) => String(row.matchday) === day.matchday)
+        .filter(() => !selectedParticipantId && !selectedModel)
+        .filter((row) => !selectedTeamId || String(row.team_id) === selectedTeamId)
         .map((row) => ({
           name: teamNames[row.team_id] || row.team_id,
           base: Number(row.weighted_points || 0),
@@ -2226,6 +2317,10 @@ document.querySelectorAll("[data-range]").forEach((button) => button.addEventLis
 document.querySelector("#participant-filter").addEventListener("change", (event) => {
   selectedParticipant = event.target.value;
   renderRanking();
+});
+document.querySelector("#ledger-filter").addEventListener("change", (event) => {
+  selectedLedgerFilter = event.target.value;
+  renderPointDetails();
 });
 
 document.querySelector("#save-tips").addEventListener("click", async () => {

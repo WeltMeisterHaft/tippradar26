@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260615-r32">
+  <link rel="stylesheet" href="styles.css?v=20260615-r33">
 </head>
 <body>
   <div class="app-shell">
@@ -240,6 +240,7 @@
           <div class="points-ledger-head">
             <div><span class="section-kicker">Nachvollziehbare Wertung</span><h2>Punkte nach Spieltag</h2><p>Spieltag aufklappen, Einzelspiel ausw&auml;hlen und bis zu Teilnehmern und Teams heruntergehen.</p></div>
             <div class="ledger-head-actions">
+              <label class="ledger-filter-label"><span>Anzeige filtern</span><select id="ledger-filter"><option value="all">Alle Teilnehmer &amp; Teams</option></select></label>
               <span id="ledger-scoring-start">Wertungsstart wird geladen</span>
               <button id="ledger-refresh" type="button">Punkte aktualisieren</button>
               <button id="ledger-expand-all" type="button">Alle &ouml;ffnen</button>
@@ -326,7 +327,7 @@
         </section>
       </section>
     </main>
-    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.15-R32 &middot; Berlin</span></footer>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.15-R33 &middot; Berlin</span></footer>
 
     <nav class="mobile-nav" aria-label="Mobile Navigation">
       <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
@@ -391,8 +392,8 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260615-r32"></script>
-  <script src="cloud.js?v=20260615-r32"></script>
-  <script src="app.js?v=20260615-r32"></script>
+  <script src="config.js?v=20260615-r33"></script>
+  <script src="cloud.js?v=20260615-r33"></script>
+  <script src="app.js?v=20260615-r33"></script>
 </body>
 </html>

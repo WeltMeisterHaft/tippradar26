@@ -550,7 +550,7 @@
       { data: teamDays, error: teamDayError }
     ] = await Promise.all([
       client.from("participant_profiles")
-        .select("id, display_name").eq("league_id", league.id),
+        .select("id, display_name, auto_strategy").eq("league_id", league.id),
       client.from("profile_predictions")
         .select("profile_id, match_id, home_score, away_score, points").eq("league_id", league.id),
       client.from("fantasy_match_points")
