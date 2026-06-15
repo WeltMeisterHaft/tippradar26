@@ -14,7 +14,8 @@ let scoringRules = JSON.parse(localStorage.getItem(ruleStorageKey) || "null") ||
 const botStrategyNames = {
   dog: "DOG-TIP / Zufall",
   rank: "RANK-TIP / FIFA-Rangliste",
-  stat: "STAT-TIP / Rang + Tormodell"
+  stat: "STAT-TIP / Rang + Tormodell",
+  dna: "DNA-TIP / WM-Erfahrung"
 };
 const rankingSnapshotDate = "19. November 2025";
 const fifaRank = {
@@ -1324,6 +1325,62 @@ function botTip(member, match) {
   return dogTip(match, member.id);
 }
 
+function pointsForResult(tip, result) {
+  if (!tip || !result) return 0;
+  const [tipHome, tipAway] = String(tip).split(":").map(Number);
+  const [actualHome, actualAway] = String(result).split(":").map(Number);
+  const priority = {
+    exact: 1, goal_difference: 2, tendency: 3, total_goals: 4,
+    home_goals: 5, away_goals: 6
+  };
+  const matches = scoringRules.filter((rule) => !rule.teamRule).filter((rule) => {
+    if (rule.criterion === "exact") return tipHome === actualHome && tipAway === actualAway;
+    if (rule.criterion === "goal_difference") return tipHome - tipAway === actualHome - actualAway;
+    if (rule.criterion === "tendency") return Math.sign(tipHome - tipAway) === Math.sign(actualHome - actualAway);
+    if (rule.criterion === "total_goals") return tipHome + tipAway === actualHome + actualAway;
+    if (rule.criterion === "home_goals") return tipHome === actualHome;
+    if (rule.criterion === "away_goals") return tipAway === actualAway;
+    return false;
+  }).sort((a, b) =>
+    (priority[a.criterion] || 99) - (priority[b.criterion] || 99)
+    || Number(b.points || 0) - Number(a.points || 0)
+  );
+  return Number(matches[0]?.points || 0);
+}
+
+function renderAutoModelPoints() {
+  const list = document.querySelector("#auto-model-points");
+  const summary = document.querySelector("#auto-model-summary");
+  if (!list || !summary) return;
+  const evaluated = tournamentSchedule.filter((match) => match.result && isMatchCounted(match));
+  const models = [
+    { strategy: "dog", label: "DOG", description: "Zufall" },
+    { strategy: "rank", label: "RANK", description: "FIFA-Rang" },
+    { strategy: "stat", label: "STAT", description: "Tormodell" },
+    { strategy: "dna", label: "DNA", description: "WM-Erfahrung" }
+  ].map((model) => ({
+    ...model,
+    points: evaluated.reduce((total, match) =>
+      total + pointsForResult(botTip({ id: `model-${model.strategy}`, strategy: model.strategy }, match), match.result), 0)
+  })).sort((a, b) => b.points - a.points || a.label.localeCompare(b.label));
+  let previousPoints = null;
+  let previousRank = 0;
+  models.forEach((model, index) => {
+    model.rank = model.points === previousPoints ? previousRank : index + 1;
+    previousPoints = model.points;
+    previousRank = model.rank;
+  });
+  summary.textContent = evaluated.length
+    ? `${evaluated.length} gewertete${evaluated.length === 1 ? "s Spiel" : " Spiele"}`
+    : "Noch kein Spiel gewertet";
+  list.innerHTML = models.map((model) => `
+    <div class="auto-model-row">
+      <span><b>${model.rank}</b><strong>${model.label}</strong><small>${model.description}</small></span>
+      <em>${model.points} Pkt.</em>
+    </div>
+  `).join("");
+}
+
 function automaticProfileTips(profile, strategy) {
   return Object.fromEntries(tournamentSchedule.filter(isMatchOpen).map((match) => {
     const automaticMember = { id: profile.id, strategy };
@@ -1415,6 +1472,7 @@ function updateHomeRanking() {
   const rankLabel = document.querySelector("#home-rank");
   const rankCopy = document.querySelector("#home-rank-copy");
   if (!rankLabel || !rankCopy) return;
+  renderAutoModelPoints();
   const ranked = profileStandings.map((profile) => ({
     ...profile,
     total: Number(profile.tipPoints || 0) + Number(profile.fantasyPoints || 0)

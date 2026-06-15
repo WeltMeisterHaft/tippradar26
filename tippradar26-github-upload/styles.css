@@ -1023,6 +1023,17 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
   box-shadow: 0 15px 45px rgba(29,43,34,.055);
 }
 .cooper-card { background: linear-gradient(135deg, #2a4336, #0c2017); }
+.auto-model-scoreboard { grid-column: 1 / -1; display: grid; gap: 7px; margin-top: 3px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.12); }
+.auto-model-heading { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.auto-model-heading span { color: var(--lime); font-size: 9px; }
+.auto-model-heading small { color: #91a198; font-size: 9px; }
+#auto-model-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.auto-model-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 7px 8px; border-radius: 9px; background: rgba(255,255,255,.06); }
+.auto-model-row > span { display: grid; grid-template-columns: 18px auto; column-gap: 5px; align-items: center; color: white; letter-spacing: 0; text-transform: none; }
+.auto-model-row b { grid-row: 1 / 3; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: var(--ink); background: var(--lime); font-size: 8px; }
+.auto-model-row strong { font-size: 10px; }
+.auto-model-row small { color: #99aaa1; font-size: 8px; }
+.auto-model-row em { color: var(--lime); font-size: 11px; font-style: normal; font-weight: 800; white-space: nowrap; }
 .date-tab { border-radius: 18px; }
 .date-tab.active {
   border-color: #d5e7a1;
@@ -1081,4 +1092,5 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
   .simulation-controls select { width: 100%; }
   .simulation-groups { grid-template-columns: 1fr; }
   .round-grid { grid-template-columns: 1fr; }
+  #auto-model-points { grid-template-columns: 1fr; }
 }

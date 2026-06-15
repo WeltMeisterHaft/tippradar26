@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260615-r31">
+  <link rel="stylesheet" href="styles.css?v=20260615-r32">
 </head>
 <body>
   <div class="app-shell">
@@ -90,7 +90,10 @@
               <h3>AUTO-TIPPER</h3>
               <p>DOG tippt zuf&auml;llig, RANK nach FIFA-Rang, STAT per Tormodell und DNA mit historischer WM-Erfahrung.</p>
             </div>
-            <div class="cooper-status"><i></i> Bereit f&uuml;r den Spieltag</div>
+            <div class="auto-model-scoreboard">
+              <div class="auto-model-heading"><span>Modellwertung</span><small id="auto-model-summary">Noch kein Spiel gewertet</small></div>
+              <div id="auto-model-points"></div>
+            </div>
           </article>
         </div>
       </section>
@@ -323,7 +326,7 @@
         </section>
       </section>
     </main>
-    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.15-R31 &middot; Berlin</span></footer>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.15-R32 &middot; Berlin</span></footer>
 
     <nav class="mobile-nav" aria-label="Mobile Navigation">
       <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
@@ -388,8 +391,8 @@
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js?v=20260615-r31"></script>
-  <script src="cloud.js?v=20260615-r31"></script>
-  <script src="app.js?v=20260615-r31"></script>
+  <script src="config.js?v=20260615-r32"></script>
+  <script src="cloud.js?v=20260615-r32"></script>
+  <script src="app.js?v=20260615-r32"></script>
 </body>
 </html>
