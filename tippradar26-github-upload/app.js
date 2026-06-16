@@ -366,6 +366,14 @@ async function loadOpenLigaMatches() {
 function renderMatches() {
   const activeAutoStrategy = window.TippRadarCloud?.activeProfile?.auto_strategy || "manual";
   const automatic = activeAutoStrategy !== "manual";
+  const simulationLabels = {
+    own: "Mein Tipp",
+    dog: "DOG",
+    rank: "RANK",
+    stat: "STAT",
+    dna: "DNA"
+  };
+  const selectedSimulationLabel = simulationLabels[simulationModel] || "Modell";
   const cloud = window.TippRadarCloud;
   const activeProfile = cloud?.activeProfile;
   const delegatedAdultOrYouth = Boolean(
@@ -381,9 +389,15 @@ function renderMatches() {
     const counted = isMatchCounted(match);
     const open = isMatchOpen(match) && counted;
     const editable = open && !automatic && !delegatedTipLocked;
+    const projectionLabel = match.projection
+      ? `Kombi: IST + ${selectedSimulationLabel}`
+      : "Offizielles Spiel";
+    const projectionDetail = match.projection
+      ? "Vorschlag aus Simulation"
+      : "Spielplan";
     return `
       <article class="match-card ${open ? "" : "match-locked"} ${delegatedTipLocked ? "delegated-tip-locked" : ""}" data-match="${match.id}" data-kickoff="${match.kickoff}">
-        <div class="match-meta"><strong>${match.time}</strong><span>${match.group}</span>${match.projection ? '<small class="projection-hint">Vorschlag aus deinen Tipps</small>' : ""}</div>
+        <div class="match-meta"><strong>${match.time}</strong><span>${match.group}</span>${match.projection ? `<small class="projection-hint">${escapeHtml(projectionLabel)}</small>` : ""}</div>
         <div class="match-teams">
           <div class="match-team"><span class="small-flag">${match.homeFlag}</span>${match.home}</div>
           <div class="match-team"><span class="small-flag">${match.awayFlag}</span>${match.away}</div>
@@ -396,15 +410,15 @@ function renderMatches() {
         <div class="match-insights">
           <div class="cooper-pick">
             <span class="cooper-badge">A</span>
-            <span><small>Prognosemodelle</small><strong>DOG / RANK / STAT / DNA</strong></span>
+            <span><small>${match.projection ? "K.O.-Vorschlag" : "Prognosemodelle"}</small><strong>${escapeHtml(projectionLabel)}</strong></span>
             <span class="confidence">${open ? "Tipps bis Anpfiff geheim" : "Tipps sichtbar"}</span>
           </div>
         </div>
         <div class="model-strip">
-          <span><small>DOG</small><b>Zufall</b></span>
-          <span><small>RANK</small><b>FIFA-Rang</b></span>
-          <span><small>STAT</small><b>Tormodell</b></span>
-          <span><small>DNA</small><b>WM-Erfahrung</b></span>
+          <span><small>BASIS</small><b>${escapeHtml(projectionDetail)}</b></span>
+          <span><small>IST</small><b>${match.result || "offen"}</b></span>
+          <span><small>MODELL</small><b>${escapeHtml(selectedSimulationLabel)}</b></span>
+          <span><small>QUELLE</small><b>${match.projection ? "Turnierbaum" : "Spielplan"}</b></span>
         </div>
         ${!counted
           ? '<div class="locked-label excluded-label">Au&szlig;er Wertung</div>'
@@ -768,13 +782,10 @@ function isPlaceholderTeam(name) {
 }
 
 function officialKnockoutEntries(official) {
-  if (!official) return null;
+  if (!official?.result) return null;
   const home = entryFromTeam(official.home);
   const away = entryFromTeam(official.away);
-  if (official.result || (!isPlaceholderTeam(official.home) && !isPlaceholderTeam(official.away))) {
-    return { home, away };
-  }
-  return null;
+  return { home, away };
 }
 
 function knockoutPhaseForDate(kickoff) {
@@ -950,13 +961,19 @@ function simulateKnockoutRound(teams, startNumber) {
   return matches;
 }
 
-function renderKnockoutRound(title, matches) {
+function renderKnockoutRound(title, matches, modelLabel) {
+  const actualCount = matches.filter((match) => match.actual).length;
+  const prognosisCount = Math.max(0, matches.length - actualCount);
   return `
     <section class="tournament-round">
-      <div class="tournament-round-title"><h3>${title}</h3><span>${matches.length} Spiel${matches.length === 1 ? "" : "e"}</span></div>
+      <div class="tournament-round-title">
+        <h3>${title}</h3>
+        <span>${matches.length} Spiel${matches.length === 1 ? "" : "e"} · Kombi: ${actualCount} IST + ${prognosisCount} ${escapeHtml(modelLabel)}</span>
+      </div>
       <div class="round-grid">${matches.map((match) => `
         <article class="knockout-match ${match.actual ? "actual" : ""} ${match.surprise ? "surprise" : ""}">
           <small>SPIEL ${match.matchId}${match.actual ? " · IST" : " · PROGNOSE"}${match.surprise ? " · ÜBERRASCHUNG" : ""}</small>
+          <span class="knockout-model-pill">${match.actual ? "IST-Ergebnis" : `Prognose: ${escapeHtml(modelLabel)}`}</span>
           <div class="knockout-team ${match.winner === match.home ? "winner" : ""}">
             <span>${escapeHtml(match.home.team)}</span><em>${match.homeGoals}</em>
           </div>
@@ -983,6 +1000,13 @@ function renderTournamentSimulation() {
     rank: "RANK / FIFA-Rangliste",
     stat: "STAT / Tormodell",
     dna: "DNA / WM-Erfahrung"
+  };
+  const modelShortNames = {
+    own: "Mein Tipp",
+    dog: "DOG",
+    rank: "RANK",
+    stat: "STAT",
+    dna: "DNA"
   };
   const groupEntries = Object.entries(simulation.groups).sort(([a], [b]) => a.localeCompare(b));
   if (!groupEntries.length) {
@@ -1041,16 +1065,17 @@ function renderTournamentSimulation() {
   const semiFinals = simulateKnockoutRound(quarterFinals.map((match) => match.winner), 101);
   const final = simulateKnockoutRound(semiFinals.map((match) => match.winner), 104);
   const champion = final[0].winner;
+  const selectedModelLabel = modelShortNames[simulationModel] || "Modell";
   bracketContainer.innerHTML = `
-    ${renderKnockoutRound("Projiziertes Sechzehntelfinale", roundOf32)}
-    ${renderKnockoutRound("Achtelfinale", roundOf16)}
-    ${renderKnockoutRound("Viertelfinale", quarterFinals)}
-    ${renderKnockoutRound("Halbfinale", semiFinals)}
-    ${renderKnockoutRound("Finale", final)}
+    ${renderKnockoutRound("Projiziertes Sechzehntelfinale", roundOf32, selectedModelLabel)}
+    ${renderKnockoutRound("Achtelfinale", roundOf16, selectedModelLabel)}
+    ${renderKnockoutRound("Viertelfinale", quarterFinals, selectedModelLabel)}
+    ${renderKnockoutRound("Halbfinale", semiFinals, selectedModelLabel)}
+    ${renderKnockoutRound("Finale", final, selectedModelLabel)}
     <div class="champion-card">
       <small>PROGNOSTIZIERTER WELTMEISTER</small>
       <strong>${escapeHtml(champion.team)}</strong>
-      <span>${modelNames[simulationModel]}</span>
+      <span>Kombi: IST-Ergebnisse + ${modelNames[simulationModel]}</span>
     </div>`;
   const missing = Math.max(0, simulation.total - simulation.predicted);
   const actualGroupGames = officialSimulationMatches().filter((match) => match.result).length;
