@@ -1,149 +1,353 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#07130f">
-  <title>TippRadar 26 - Kurzanleitung</title>
-  <style>
-    :root { --ink:#07130f; --lime:#c9ff38; --paper:#f6f2e8; --muted:#68756f; --line:#d9ded7; }
-    * { box-sizing:border-box; }
-    body { margin:0; color:var(--ink); background:var(--paper); font:15px/1.55 Arial,sans-serif; }
-    header { padding:56px 22px; color:white; background:linear-gradient(135deg,#07130f,#173729); }
-    header div, main { width:min(920px,100%); margin:auto; }
-    .kicker { color:var(--lime); font-size:11px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
-    h1 { margin:8px 0 12px; font-size:clamp(38px,7vw,68px); line-height:1; letter-spacing:-.05em; }
-    header p { max-width:650px; color:#b8c4be; }
-    .back { display:inline-block; margin-top:18px; padding:11px 16px; border-radius:24px; color:var(--ink); background:var(--lime); font-weight:800; text-decoration:none; }
-    main { padding:34px 20px 70px; }
-    nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:26px; }
-    nav a { padding:8px 12px; border:1px solid var(--line); border-radius:20px; color:var(--ink); background:white; text-decoration:none; font-weight:700; }
-    section { margin:16px 0; padding:25px; border:1px solid var(--line); border-radius:20px; background:#fffdf8; }
-    h2 { margin:0 0 14px; font-size:25px; letter-spacing:-.03em; }
-    h3 { margin:22px 0 7px; font-size:16px; }
-    ol, ul { padding-left:22px; }
-    li { margin:7px 0; }
-    .note { padding:13px 15px; border-radius:10px; background:#edf6d2; }
-    .score { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-    .score div { padding:13px; border-radius:11px; background:#f0f2ed; }
-    .score strong { display:block; font-size:19px; }
-    code { padding:2px 5px; border-radius:4px; background:#edf0ea; }
-    footer { color:var(--muted); font-size:12px; text-align:center; }
-    @media(max-width:600px){ .score{grid-template-columns:1fr;} section{padding:20px;} }
-    @media print { header{padding:25px;color:var(--ink);background:white}.back,nav{display:none}section{break-inside:avoid} }
-  </style>
-</head>
-<body>
-  <header>
-    <div>
-      <span class="kicker">TippRadar 26</span>
-      <h1>So funktioniert's.</h1>
-      <p>Die kurze Anleitung für Einzelspieler, Familien und Team-Leads. Anmeldung, Tipps und Top 5 dauern zusammen nur wenige Minuten.</p>
-      <a class="back" href="../index.html">Zur Tipp-App</a>
-    </div>
-  </header>
-  <main>
-    <nav>
-      <a href="#start">Erste Anmeldung</a>
-      <a href="#tippen">Tippen</a>
-      <a href="#family">Family</a>
-      <a href="#top5">Meine Top 5</a>
-      <a href="#punkte">Punkte</a>
-      <a href="#orga">Organisator</a>
-    </nav>
+-- TippRadar26: Ein Family-Team-Lead darf fuer alle Mitglieder des eigenen Teams tippen.
 
-    <section id="start">
-      <h2>1. Erste Anmeldung</h2>
-      <ol>
-        <li>Öffne <a href="../index.html">TippRadar 26</a> und klicke oben rechts auf <strong>Anmelden</strong>.</li>
-        <li>Öffne den persönlichen Anmeldelink aus der E-Mail. Ein Passwort ist nicht nötig.</li>
-        <li>Bei einer direkten Einladung durch den Organisator sind Name, Team und Rolle bereits zugeordnet.</li>
-        <li>Nur ohne persönliche Einladung werden Anzeigename und Einladungscode benötigt.</li>
-        <li>Wähle <strong>Single</strong> oder <strong>Family</strong> und klicke auf <strong>Beitreten</strong>.</li>
-      </ol>
-      <p class="note"><strong>Wichtig:</strong> Verwende genau den Namen, den der Organisator für dich unter „Teams & Spieler“ eingetragen hat.</p>
-    </section>
+alter table public.participant_profiles
+  alter column account_user_id drop not null;
 
-    <section id="tippen">
-      <h2>2. Ergebnisse tippen</h2>
-      <ol>
-        <li>Öffne den Bereich <strong>Tippen</strong>.</li>
-        <li>Wähle die <strong>Vorrunde</strong> nach Spieltag oder eine K.-o.-Runde vom Sechzehntelfinale bis zum Finale.</li>
-        <li>Noch nicht feststehende K.-o.-Mannschaften werden aus deinen bisherigen Tipps vorgeschlagen. Deine Ergebnis-Tipps bleiben im jeweiligen WM-Spielslot gespeichert.</li>
-        <li>Trage für jedes offene Spiel das Ergebnis nach 90 Minuten ein.</li>
-        <li>Klicke unten auf <strong>Tipps speichern</strong>.</li>
-      </ol>
-      <p>Bis zum Anpfiff kannst du einen Tipp ändern. Danach wird das Spiel automatisch geschlossen und die Tipps der Runde werden sichtbar.</p>
-      <p class="note">Unter den Spielen berechnet der <strong>simulierte Turnierbaum</strong> die zwölf Gruppentabellen und alle K.-o.-Runden bis zum Weltmeister. Als Grundlage kannst du deinen eigenen Tipp oder DOG, RANK, STAT beziehungsweise DNA auswählen. Bereits gespielte Ergebnisse bleiben dabei verbindlich.</p>
-    </section>
+create or replace function public.sync_current_participant_role()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_league uuid;
+  member_name text;
+  prepared_role text;
+  primary_profile uuid;
+begin
+  select league_id, display_name
+  into target_league, member_name
+  from public.league_members
+  where user_id = auth.uid()
+  limit 1;
 
-    <section id="family">
-      <h2>3. Family-Konto</h2>
-      <p>Der Family-Team-Lead kann stellvertretend für alle Mitglieder des eigenen Teams tippen. Erwachsene und Jugendliche mit eigenem Zugang melden sich jeweils mit einer eigenen E-Mail-Adresse an und sehen selbst nur ihr eigenes Profil. Unter 16 Jahren ist die Zustimmung der Eltern erforderlich.</p>
-      <ol>
-        <li>Öffne oben rechts das Kontofenster.</li>
-        <li>Stelle die Kontoart auf <strong>Family</strong>.</li>
-        <li>Lege über <strong>+ Kinderprofil</strong> die Kinder ohne eigene E-Mail an.</li>
-        <li>Weitere Erwachsene und Jugendliche erhalten ihre persönliche Einladung direkt vom Organisator.</li>
-        <li>Wähle direkt im Bereich <strong>Tippen</strong> unter <strong>Tipps erfassen für</strong> das richtige Profil.</li>
-      </ol>
-      <p class="note">Team-Lead, Erwachsene und Kinder sind in der App mit Rollen-Badge, Teamname und Teamfarbe gekennzeichnet. Jedes Profil besitzt eigene Tipps, Punkte und eine eigene Top-5-Auswahl.</p>
-      <p class="note">Der Family-Lead kann ein Familienprofil auswählen und dessen Tippmodus auf DOG, RANK, STAT oder wieder Manuell stellen. Automatisch ersetzt werden nur Tipps für noch offene Spiele.</p>
-    </section>
+  if target_league is null then
+    return null;
+  end if;
 
-    <section id="top5">
-      <h2>4. Meine Top 5</h2>
-      <ol>
-        <li>Wähle in jeder der fünf Zeilen zuerst eine Nationalmannschaft.</li>
-        <li>Danach erscheint automatisch deren aktueller Kader inklusive Position: TOR, ABWEHR, MITTELFELD oder STURM.</li>
-        <li>Wähle einen Spieler und wiederhole dies bis zu fünfmal.</li>
-        <li>Klicke auf <strong>Top 5 speichern</strong>.</li>
-      </ol>
-      <p>Die Auswahl gilt für das ganze Turnier und wird mit dem ersten Turnierspiel geschlossen.</p>
-      <p class="note">Ist API-Football nicht erreichbar oder liefert keinen Kader, lädt die App automatisch den öffentlichen WM-Kaderstand. Ein erfolgreich geladener Kader wird auf dem Gerät gespeichert und bei einem späteren Ausfall weiterverwendet. Die Auswahl zeigt Position, Länderspieltore, Einsätze (LS) und „Tore je 10 LS“. „WM“ zeigt separat die bereits erzielten Tore im laufenden Turnier. Quelle: <a href="https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads" target="_blank" rel="noopener">WM-Kaderübersicht</a>.</p>
-    </section>
+  select coalesce(member->>'role', 'adult')
+  into prepared_role
+  from public.league_state state
+  cross join lateral jsonb_array_elements(state.teams) team
+  cross join lateral jsonb_array_elements(team->'members') member
+  where state.league_id = target_league
+    and lower(trim(member->>'name')) = lower(trim(member_name))
+    and not coalesce((member->>'bot')::boolean, false)
+  limit 1;
 
-    <section id="punkte">
-      <h2>5. Punkte und Teams</h2>
-      <p>Unter <strong>Rang &amp; Form</strong> zeigt eine aufklappbare Tabelle zuerst die Spieltage. Darunter lassen sich Einzelspiele, Teilnehmer und zuletzt die konkret erfüllten Tippkategorien wie „Exaktes Ergebnis“ oder „Richtige Tendenz“ öffnen.</p>
-      <div class="score">
-        <div><strong>4 Punkte</strong>Exaktes Ergebnis</div>
-        <div><strong>3 Punkte</strong>Richtige Tordifferenz</div>
-        <div><strong>2 Punkte</strong>Richtige Tendenz</div>
-        <div><strong>+1 Punkt</strong>Optionale Zusatzkategorie</div>
-        <div><strong>+1 je Tor</strong>Tor eines Top-5-Spielers</div>
-        <div><strong>+1 je Sieg</strong>Team eines Top-5-Spielers gewinnt</div>
-      </div>
-      <p>Die in der App angezeigten Regeln sind verbindlich. Für die Teamwertung zählen pro Spieltag die fünf punktbesten gewichteten Teilnehmer eines Teams.</p>
-    </section>
+  if prepared_role not in ('lead', 'adult', 'youth') then
+    return null;
+  end if;
 
-    <section id="orga">
-      <h2>6. Hinweise für den Organisator</h2>
-      <ul>
-        <li>Teams als `Family` oder `Single` und Teilnehmer mit ihrer Rolle anlegen.</li>
-        <li>Der Ersteller der Runde ist automatisch Organisator. Nur dieses Konto kann Bewertungskategorien und Punktzahlen ändern.</li>
-        <li>Unter <strong>Teams &amp; Regeln</strong> legt der Organisator den Wertungsstart mit Datum und Uhrzeit fest. Frühere Spiele bleiben sichtbar, zählen aber mit null Punkten.</li>
-        <li>Anzeigenamen in App und Teamkarte müssen übereinstimmen.</li>
-        <li>Bei Team-Leads, Erwachsenen und Jugendlichen die E-Mail eintragen und auf <strong>Einladen</strong> klicken.</li>
-        <li>Der allgemeine Einladungscode bleibt als Ausweichmöglichkeit verfügbar.</li>
-        <li>OpenLigaDB aktualisiert Spielplan und Ergebnisse.</li>
-        <li>API-Football liefert Kader und Torschützen automatisch.</li>
-        <li>Die Torschützen-Korrektur nur verwenden, wenn ein automatischer Eintrag fehlt.</li>
-      </ul>
-    </section>
+  update public.league_members
+  set account_type = case when prepared_role = 'lead' then 'family' else 'single' end
+  where league_id = target_league
+    and user_id = auth.uid();
 
-    <section>
-      <h2>Häufige Fragen</h2>
-      <h3>Ich habe keine Anmelde-E-Mail erhalten.</h3>
-      <p>Spam-Ordner prüfen, mindestens 60 Sekunden warten und den Link nicht mehrfach schnell hintereinander anfordern.</p>
-      <h3>Mein Kind hat kein eigenes Handy.</h3>
-      <p>Das ist kein Problem. Der Team-Lead wählt direkt im Bereich <strong>Tippen</strong> das Kinderprofil aus.</p>
-      <h3>Mein Tipp ist gesperrt.</h3>
-      <p>Nach dem offiziellen Anpfiff kann ein Tipp nicht mehr verändert werden.</p>
-      <h3>Der Kader erscheint nicht.</h3>
-      <p>Seite einmal neu laden. Bleibt das Problem bestehen, kurz dem Organisator Bescheid geben.</p>
-    </section>
-    <footer>TippRadar 26 · Unsere WM-Runde</footer>
-  </main>
-</body>
-</html>
+  select id
+  into primary_profile
+  from public.participant_profiles
+  where league_id = target_league
+    and account_user_id = auth.uid()
+    and is_primary
+  limit 1;
+
+  if primary_profile is not null then
+    update public.participant_profiles
+    set profile_type = prepared_role
+    where id = primary_profile;
+  else
+    select id
+    into primary_profile
+    from public.participant_profiles
+    where league_id = target_league
+      and lower(trim(display_name)) = lower(trim(member_name))
+      and account_user_id is null
+    limit 1;
+
+    if primary_profile is not null then
+      update public.participant_profiles
+      set account_user_id = auth.uid(),
+          profile_type = prepared_role,
+          is_primary = true
+      where id = primary_profile;
+    end if;
+  end if;
+
+  return prepared_role;
+end
+$$;
+
+create or replace function public.sync_team_participant_profiles()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_league uuid;
+  lead_name text;
+  team_members jsonb;
+  team_member jsonb;
+  member_name text;
+  member_role text;
+  inserted_count integer := 0;
+begin
+  select league_id, display_name
+  into target_league, lead_name
+  from public.league_members
+  where user_id = auth.uid()
+    and account_type = 'family'
+  limit 1;
+
+  if target_league is null then
+    raise exception 'Dieses Konto ist kein Family-Team-Lead';
+  end if;
+
+  select team->'members'
+  into team_members
+  from public.league_state state
+  cross join lateral jsonb_array_elements(state.teams) team
+  where state.league_id = target_league
+    and exists (
+      select 1
+      from jsonb_array_elements(team->'members') lead_member
+      where lower(trim(lead_member->>'name')) = lower(trim(lead_name))
+        and coalesce(lead_member->>'role', 'adult') = 'lead'
+        and not coalesce((lead_member->>'bot')::boolean, false)
+    )
+  limit 1;
+
+  if team_members is null then
+    raise exception 'Kein passendes Family-Team gefunden';
+  end if;
+
+  for team_member in select value from jsonb_array_elements(team_members)
+  loop
+    member_name := trim(team_member->>'name');
+    member_role := coalesce(team_member->>'role', 'adult');
+
+    if member_name <> ''
+      and member_role in ('lead', 'adult', 'youth', 'child')
+      and not coalesce((team_member->>'bot')::boolean, false)
+      and not exists (
+        select 1
+        from public.participant_profiles profile
+        where profile.league_id = target_league
+          and lower(trim(profile.display_name)) = lower(member_name)
+      )
+    then
+      insert into public.participant_profiles(
+        league_id, account_user_id, display_name, profile_type, is_primary
+      )
+      values (
+        target_league,
+        case when member_role in ('lead', 'child') then auth.uid() else null end,
+        member_name,
+        member_role,
+        false
+      );
+      inserted_count := inserted_count + 1;
+    end if;
+  end loop;
+
+  return inserted_count;
+end
+$$;
+
+create or replace function public.can_team_lead_manage_profile(target_profile uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.participant_profiles target
+    join public.league_members lead_account
+      on lead_account.league_id = target.league_id
+     and lead_account.user_id = auth.uid()
+     and lead_account.account_type = 'family'
+    join public.league_state state
+      on state.league_id = target.league_id
+    cross join lateral jsonb_array_elements(state.teams) team
+    where target.id = target_profile
+      and exists (
+        select 1
+        from jsonb_array_elements(team->'members') lead_member
+        where lower(trim(lead_member->>'name')) = lower(trim(lead_account.display_name))
+          and coalesce(lead_member->>'role', 'adult') = 'lead'
+          and not coalesce((lead_member->>'bot')::boolean, false)
+      )
+      and exists (
+        select 1
+        from jsonb_array_elements(team->'members') target_member
+        where lower(trim(target_member->>'name')) = lower(trim(target.display_name))
+          and not coalesce((target_member->>'bot')::boolean, false)
+      )
+  )
+$$;
+
+create or replace function public.can_manage_participant_profile(target_profile uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.participant_profiles profile
+    where profile.id = target_profile
+      and profile.account_user_id = auth.uid()
+      and (profile.is_primary or profile.profile_type = 'child')
+  )
+  or public.can_team_lead_manage_profile(target_profile)
+$$;
+
+create or replace function public.can_directly_manage_participant_profile(target_profile uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.participant_profiles profile
+    where profile.id = target_profile
+      and profile.account_user_id = auth.uid()
+      and (profile.is_primary or profile.profile_type = 'child')
+  )
+$$;
+
+drop policy if exists "members read started profile tips" on public.profile_predictions;
+create policy "members read started profile tips" on public.profile_predictions for select
+using (
+  public.can_manage_participant_profile(profile_id)
+  or (
+    public.is_league_member(league_id)
+    and exists (
+      select 1
+      from public.match_schedule schedule
+      where schedule.league_id = profile_predictions.league_id
+        and schedule.match_id = profile_predictions.match_id
+        and schedule.kickoff <= now()
+    )
+  )
+);
+
+drop policy if exists "owners write profile tips" on public.profile_predictions;
+drop policy if exists "managed profiles insert tips" on public.profile_predictions;
+drop policy if exists "profile owners update tips" on public.profile_predictions;
+drop policy if exists "profile owners delete tips" on public.profile_predictions;
+
+create policy "managed profiles insert tips" on public.profile_predictions for insert
+with check (
+  public.can_manage_participant_profile(profile_id)
+  and exists (
+    select 1
+    from public.match_schedule schedule
+    where schedule.league_id = profile_predictions.league_id
+      and schedule.match_id = profile_predictions.match_id
+      and schedule.kickoff > now()
+  )
+);
+
+create policy "profile owners update tips" on public.profile_predictions for update
+using (public.can_directly_manage_participant_profile(profile_id))
+with check (
+  public.can_directly_manage_participant_profile(profile_id)
+  and exists (
+    select 1
+    from public.match_schedule schedule
+    where schedule.league_id = profile_predictions.league_id
+      and schedule.match_id = profile_predictions.match_id
+      and schedule.kickoff > now()
+  )
+);
+
+create policy "profile owners delete tips" on public.profile_predictions for delete
+using (public.can_directly_manage_participant_profile(profile_id));
+
+create or replace function public.save_profile_predictions(target_profile uuid, tips jsonb)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_league uuid;
+  direct_access boolean;
+  changed integer := 0;
+begin
+  select league_id
+  into target_league
+  from public.participant_profiles
+  where id = target_profile;
+
+  if target_league is null or not public.can_manage_participant_profile(target_profile) then
+    raise exception 'Dieses Profil darf von diesem Konto nicht getippt werden';
+  end if;
+
+  direct_access := public.can_directly_manage_participant_profile(target_profile);
+
+  if direct_access then
+    insert into public.profile_predictions(
+      league_id, profile_id, match_id, home_score, away_score
+    )
+    select target_league, target_profile, item->>'match_id',
+      (item->>'home_score')::smallint, (item->>'away_score')::smallint
+    from jsonb_array_elements(tips) item
+    where exists (
+      select 1
+      from public.match_schedule schedule
+      where schedule.league_id = target_league
+        and schedule.match_id = item->>'match_id'
+        and schedule.kickoff > now()
+    )
+    on conflict (league_id, profile_id, match_id) do update set
+      home_score = excluded.home_score,
+      away_score = excluded.away_score,
+      updated_at = now();
+  else
+    insert into public.profile_predictions(
+      league_id, profile_id, match_id, home_score, away_score
+    )
+    select target_league, target_profile, item->>'match_id',
+      (item->>'home_score')::smallint, (item->>'away_score')::smallint
+    from jsonb_array_elements(tips) item
+    where exists (
+      select 1
+      from public.match_schedule schedule
+      where schedule.league_id = target_league
+        and schedule.match_id = item->>'match_id'
+        and schedule.kickoff > now()
+    )
+      and not exists (
+        select 1
+        from public.profile_predictions existing
+        where existing.league_id = target_league
+          and existing.profile_id = target_profile
+          and existing.match_id = item->>'match_id'
+      )
+    on conflict (league_id, profile_id, match_id) do nothing;
+  end if;
+
+  get diagnostics changed = row_count;
+  return changed;
+end
+$$;
+
+drop policy if exists "owners write fantasy picks" on public.fantasy_picks;
+create policy "owners write fantasy picks" on public.fantasy_picks for all
+using (public.can_manage_participant_profile(profile_id))
+with check (public.can_manage_participant_profile(profile_id));
+
+grant execute on function public.can_team_lead_manage_profile(uuid) to authenticated;
+grant execute on function public.can_manage_participant_profile(uuid) to authenticated;
+grant execute on function public.can_directly_manage_participant_profile(uuid) to authenticated;
+grant execute on function public.sync_current_participant_role() to authenticated;
+grant execute on function public.sync_team_participant_profiles() to authenticated;
+grant execute on function public.save_profile_predictions(uuid, jsonb) to authenticated;
