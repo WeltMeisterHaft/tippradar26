@@ -2454,17 +2454,24 @@ document.querySelector("#date-tabs").addEventListener("click", (event) => {
   document.querySelector("#matches-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-document.querySelector("#refresh-simulation").addEventListener("click", () => {
+function refreshSimulationAndKoCards() {
   savedTips = collectTips();
   localStorage.setItem(storageKey, JSON.stringify(savedTips));
+  applyMatchView();
+  updateDateTabs(tournamentSchedule);
+  renderMatches();
   renderTournamentSimulation();
+}
+
+document.querySelector("#refresh-simulation").addEventListener("click", () => {
+  refreshSimulationAndKoCards();
   const modelName = document.querySelector("#simulation-model").selectedOptions[0]?.textContent || "Auswahl";
   showToast("Simulation aktualisiert", `Gruppentabellen und K.-o.-Projektion wurden mit ${modelName} neu berechnet.`);
 });
 document.querySelector("#simulation-model").addEventListener("change", (event) => {
   simulationModel = event.target.value;
   localStorage.setItem(simulationModelStorageKey, simulationModel);
-  renderTournamentSimulation();
+  refreshSimulationAndKoCards();
 });
 
 document.querySelector("#save-fantasy-picks").addEventListener("click", async () => {
