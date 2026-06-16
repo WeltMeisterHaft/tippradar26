@@ -196,6 +196,20 @@ function updateHomeHero(schedule) {
   document.querySelector("#hero-versus").textContent = featured.result || "VS";
   document.querySelector("#hero-score-label").textContent = featured.result ? "Ergebnis" : "Status";
   document.querySelector("#hero-score").textContent = featured.result || (isToday ? "Heute" : "Kommend");
+  const modelBox = document.querySelector("#hero-model-predictions");
+  if (modelBox) {
+    const models = [
+      ["DOG", "dog"],
+      ["RANK", "rank"],
+      ["STAT", "stat"],
+      ["DNA", "dna"]
+    ];
+    modelBox.innerHTML = `
+      <span>Prognosen</span>
+      ${models.map(([label, strategy]) => `
+        <div><small>${label}</small><b>${botTip({ id: `hero-${strategy}`, strategy }, featured)}</b></div>
+      `).join("")}`;
+  }
 
   const countdown = document.querySelector("#countdown");
   if (isUpcoming) {
@@ -837,7 +851,37 @@ function allTippableMatches() {
   ].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff) || String(a.id).localeCompare(String(b.id)));
 }
 
-function simulateKnockoutMatch(home, away, matchId) {
+function officialKnockoutMatch(matchNumber) {
+  return tournamentSchedule.find((match) => String(match.id) === `projection-${matchNumber}`);
+}
+
+function entryFromTeam(team) {
+  return { team: team || "Noch offen", group: "IST" };
+}
+
+function simulateKnockoutMatch(home, away, matchId, official = null) {
+  if (official) {
+    const homeEntry = entryFromTeam(official.home);
+    const awayEntry = entryFromTeam(official.away);
+    if (official.result) {
+      const [actualHome, actualAway] = official.result.split(":").map(Number);
+      const winner = actualHome >= actualAway ? homeEntry : awayEntry;
+      const loser = winner === homeEntry ? awayEntry : homeEntry;
+      return {
+        matchId,
+        home: homeEntry,
+        away: awayEntry,
+        homeGoals: actualHome,
+        awayGoals: actualAway,
+        winner,
+        decidedBy: "IST",
+        actual: true,
+        surprise: rankFor(winner.team) > rankFor(loser.team)
+      };
+    }
+    home = homeEntry;
+    away = awayEntry;
+  }
   const strategy = simulationModel === "own" ? "stat" : simulationModel;
   const ownTip = simulationModel === "own" ? collectTips()[`projection-${matchId}`] : null;
   const [homeGoals, awayGoals] = ownTip
@@ -865,13 +909,14 @@ function simulateKnockoutMatch(home, away, matchId) {
       decidedBy = "n. E.";
     }
   }
-  return { matchId, home, away, homeGoals, awayGoals, winner, decidedBy };
+  return { matchId, home, away, homeGoals, awayGoals, winner, decidedBy, actual: false, surprise: false };
 }
 
 function simulateKnockoutRound(teams, startNumber) {
   const matches = [];
   for (let index = 0; index < teams.length; index += 2) {
-    matches.push(simulateKnockoutMatch(teams[index], teams[index + 1], startNumber + (index / 2)));
+    const number = startNumber + (index / 2);
+    matches.push(simulateKnockoutMatch(teams[index], teams[index + 1], number, officialKnockoutMatch(number)));
   }
   return matches;
 }
@@ -881,8 +926,8 @@ function renderKnockoutRound(title, matches) {
     <section class="tournament-round">
       <div class="tournament-round-title"><h3>${title}</h3><span>${matches.length} Spiel${matches.length === 1 ? "" : "e"}</span></div>
       <div class="round-grid">${matches.map((match) => `
-        <article class="knockout-match">
-          <small>SPIEL ${match.matchId}</small>
+        <article class="knockout-match ${match.actual ? "actual" : ""} ${match.surprise ? "surprise" : ""}">
+          <small>SPIEL ${match.matchId}${match.actual ? " · IST" : ""}${match.surprise ? " · ÜBERRASCHUNG" : ""}</small>
           <div class="knockout-team ${match.winner === match.home ? "winner" : ""}">
             <span>${escapeHtml(match.home.team)}</span><em>${match.homeGoals}</em>
           </div>
@@ -960,7 +1005,7 @@ function renderTournamentSimulation() {
     [88, second("D"), second("G")]
   ];
   const roundOf32 = pairings.map(([number, home, away]) =>
-    simulateKnockoutMatch(home, away, number)
+    simulateKnockoutMatch(home, away, number, officialKnockoutMatch(number))
   );
   const roundOf16 = simulateKnockoutRound(roundOf32.map((match) => match.winner), 89);
   const quarterFinals = simulateKnockoutRound(roundOf16.map((match) => match.winner), 97);

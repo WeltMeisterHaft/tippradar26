@@ -411,6 +411,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .simulation-bracket h3 { margin: 0 0 12px; font: 800 18px "Manrope"; }
 .round-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .knockout-match { padding: 12px; border-radius: 14px; color: white; background: linear-gradient(135deg, #294638, #0d2118); }
+.knockout-match.actual { box-shadow: inset 0 0 0 1px rgba(201,255,56,.45); }
+.knockout-match.surprise { background: linear-gradient(135deg, #4a2d4f, #10251b); }
 .knockout-match small { color: #a7b7af; font-size: 8px; letter-spacing: .08em; }
 .knockout-team { display: flex; justify-content: space-between; gap: 7px; padding-top: 8px; font-size: 10px; font-weight: 800; }
 .knockout-team + .knockout-team { margin-top: 7px; border-top: 1px solid rgba(255,255,255,.12); }
@@ -612,12 +614,17 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
 .hero-metrics strong { color: white; font-family: "Manrope"; font-size: 17px; letter-spacing: 0; }
 .match-stage { position: relative; }
 .stage-glow { position: absolute; inset: 12%; background: var(--lime); filter: blur(90px); opacity: .1; }
-.prediction-split { border-top: 1px solid rgba(255,255,255,.1); padding-top: 17px; display: grid; grid-template-columns: 1fr 1px 1fr; gap: 18px; }
+.prediction-split { border-top: 1px solid rgba(255,255,255,.1); padding-top: 17px; display: grid; grid-template-columns: .7fr 1px 1.3fr; gap: 18px; }
 .prediction-split > div { display: flex; justify-content: space-between; align-items: center; }
 .prediction-split span { color: #94a59d; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .prediction-split strong { font-family: "Manrope"; font-size: 19px; }
 .prediction-split > i { background: rgba(255,255,255,.12); }
 .prediction-split .cooper-mini strong { color: var(--lime); }
+.hero-model-predictions { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; align-items: stretch !important; }
+.hero-model-predictions > span { grid-column: 1 / -1; }
+.hero-model-predictions div { display: grid; gap: 2px; padding: 6px 7px; border-radius: 9px; background: rgba(255,255,255,.06); }
+.hero-model-predictions small { color: #94a59d; font-size: 8px; font-weight: 800; letter-spacing: .08em; }
+.hero-model-predictions b { color: var(--lime); font: 800 13px "Manrope"; }
 .dashboard-grid.upgraded { grid-template-columns: 1fr 1fr 1.08fr; }
 .form-card { overflow: hidden; }
 .mini-form { position: absolute; right: 20px; top: 25px; display: flex; align-items: end; gap: 3px; height: 32px; }
