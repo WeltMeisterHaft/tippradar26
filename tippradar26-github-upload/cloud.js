@@ -147,13 +147,9 @@
     if (error) throw error;
   }
 
-  async function verifyEmailCode(email, token) {
-    if (!client) throw new Error("Supabase ist noch nicht eingerichtet.");
-    const { data, error } = await client.auth.verifyOtp({
-      email,
-      token,
-      type: "email"
-    });
+  async function reloadSession() {
+    if (!client) return null;
+    const { data, error } = await client.auth.getSession();
     if (error) throw error;
     session = data.session;
     if (session) {
@@ -161,6 +157,21 @@
       await loadMembership();
     }
     return session;
+  }
+
+  async function verifyEmailCode(email, token) {
+    if (!client) throw new Error("Supabase ist noch nicht eingerichtet.");
+    const otpTypes = ["email", "magiclink"];
+    let lastError = null;
+    for (const type of otpTypes) {
+      const { data, error } = await client.auth.verifyOtp({ email, token, type });
+      if (!error) {
+        session = data.session;
+        return reloadSession();
+      }
+      lastError = error;
+    }
+    throw lastError || new Error("Der Anmeldecode konnte nicht bestaetigt werden.");
   }
 
   async function claimParticipantInvite() {
@@ -171,6 +182,7 @@
   }
 
   async function refreshSessionContext() {
+    if (!session) await reloadSession();
     if (!session) return null;
     await claimParticipantInvite();
     return loadMembership();
@@ -610,7 +622,7 @@
   }
 
   window.TippRadarCloud = {
-    init, sendMagicLink, verifyEmailCode, claimParticipantInvite, refreshSessionContext,
+    init, sendMagicLink, verifyEmailCode, reloadSession, claimParticipantInvite, refreshSessionContext,
     loadParticipantInvites, inviteParticipant, signOut, createLeague, joinLeague, ensurePrimaryProfile,
     loadProfiles, selectProfile, setManageableProfileIds, syncCurrentParticipantRole, syncTeamParticipantProfiles,
     addFamilyProfile, updateProfileType, renameProfile, setProfileAutoStrategy,
