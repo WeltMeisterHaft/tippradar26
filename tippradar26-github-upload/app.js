@@ -1043,6 +1043,9 @@ function renderTournamentSimulation() {
   groupContainer.innerHTML = groupEntries.map(([group, rows]) => `
     <article class="simulation-group">
       <h3>Gruppe ${group}</h3>
+      <div class="simulation-row simulation-row-head">
+        <span></span><strong>Team</strong><span title="Punkte">Pkt</span><span title="Tordifferenz">Diff</span><span title="Erzielte Tore">Tore</span>
+      </div>
       ${rows.map((row, index) => `
         <div class="simulation-row ${index < 2 ? "qualifier" : ""} ${index === 2 && qualifiedThirdGroups.has(group) ? "third-qualified" : ""}">
           <span class="rank">${index + 1}.</span><strong>${escapeHtml(row.team)}</strong>

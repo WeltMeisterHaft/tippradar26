@@ -403,6 +403,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 28px 80px; }
   font-size: 10px;
 }
 .simulation-row.qualifier { background: #f3fbdc; }
+.simulation-row-head {
+  min-height: 30px;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  color: #72816c;
+  background: #f7f9f1;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.simulation-row-head strong { color: #72816c; font-size: 8px; }
 .simulation-row.third-qualified { box-shadow: inset 3px 0 var(--violet); }
 .simulation-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .simulation-row span:not(:nth-child(2)) { text-align: right; color: var(--muted); }
