@@ -757,12 +757,28 @@ function initialKnockoutPairings(simulation) {
 }
 
 function projectedWinner(match, tips) {
-  const tip = tips[String(match.id)];
-  if (tip && Number(tip.home) !== Number(tip.away)) {
-    return Number(tip.home) > Number(tip.away) ? match.homeEntry : match.awayEntry;
+  if (!match) return { team: "Noch offen" };
+  if (match.result) {
+    const [actualHome, actualAway] = match.result.split(":").map(Number);
+    return actualHome >= actualAway ? match.homeEntry : match.awayEntry;
   }
-  const [home, away] = statTip(match).split(":").map(Number);
-  if (home !== away) return home > away ? match.homeEntry : match.awayEntry;
+  const strategy = simulationModel === "own" ? "stat" : simulationModel;
+  const ownTip = simulationModel === "own" ? tips[String(match.id)] : null;
+  const [homeGoals, awayGoals] = ownTip
+    ? [Number(ownTip.home), Number(ownTip.away)]
+    : botTip({ id: `projection-${strategy}`, strategy }, match).split(":").map(Number);
+  if (homeGoals > awayGoals) return match.homeEntry;
+  if (awayGoals > homeGoals) return match.awayEntry;
+  if (strategy === "dog") {
+    return seededNumber(`projection-${match.id}-${match.home}-${match.away}`) >= 0.5
+      ? match.homeEntry
+      : match.awayEntry;
+  }
+  if (strategy === "dna") {
+    const homeDna = tournamentDnaScore(match.home);
+    const awayDna = tournamentDnaScore(match.away);
+    if (homeDna !== awayDna) return homeDna > awayDna ? match.homeEntry : match.awayEntry;
+  }
   return rankFor(match.home) <= rankFor(match.away) ? match.homeEntry : match.awayEntry;
 }
 
