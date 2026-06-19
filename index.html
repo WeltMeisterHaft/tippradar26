@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#07130f">
+  <meta name="description" content="TippRadar 26 - das Community-Tippspiel zur WM 2026.">
+  <title>TippRadar 26</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=20260618-r43">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="TippRadar Startseite">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>TippRadar <strong>26</strong><small>Unsere WM-Runde</small></span>
+      </a>
+      <nav class="desktop-nav" aria-label="Hauptnavigation">
+        <button class="nav-link active" data-view="home">Heute</button>
+        <button class="nav-link" data-view="tips">Tippen</button>
+        <button class="nav-link" data-view="ranking">Rang &amp; Form</button>
+        <button class="nav-link" data-view="teams">Teams &amp; Regeln</button>
+      </nav>
+      <button class="profile-button" id="account-button" aria-label="Konto &ouml;ffnen">
+        <span class="profile-copy"><strong id="account-name">Lokal</strong><small id="account-status">Nur auf diesem Ger&auml;t</small></span>
+        <span class="avatar" id="account-avatar">&ndash;</span>
+      </button>
+    </header>
+
+    <main>
+      <section class="view active" id="home-view">
+        <div class="hero premium-hero">
+          <div class="hero-copy">
+            <span class="eyebrow" id="hero-status"><i></i><span id="hero-status-copy">WM 2026 &middot; </span><strong id="countdown">Spielplan wird geladen</strong></span>
+            <h1>Unser Sommer.<br><span>Unsere Tipps.</span></h1>
+            <p>Gemeinsam fiebern, tippen und staunen. Vier Prognosemodelle zeigen, wie unterschiedlich eine WM laufen kann.</p>
+            <button class="primary-button" data-go="tips">Meinen Tipp abgeben <span aria-hidden="true">&rarr;</span></button>
+            <div class="hero-metrics">
+              <span><strong id="metric-matches">&ndash;</strong> Spiele geladen</span>
+              <span><strong id="metric-participants">&ndash;</strong> Teilnehmer</span>
+              <span><strong>4</strong> Tippmodelle</span>
+            </div>
+          </div>
+
+          <div class="match-stage">
+            <div class="stage-glow"></div>
+            <div class="hero-card">
+              <div class="card-topline">
+                <span class="live-badge" id="hero-match-label">N&auml;chstes Spiel</span>
+                <span id="hero-match-location">Spielplan wird geladen</span>
+              </div>
+              <div class="match-visual">
+                <div class="team-large"><span class="flag" id="hero-home-flag">&#x26BD;</span><strong id="hero-home-name">Heimteam</strong></div>
+                <div class="kickoff"><small id="hero-kickoff">Termin offen</small><span id="hero-versus">VS</span></div>
+                <div class="team-large"><span class="flag" id="hero-away-flag">&#x26BD;</span><strong id="hero-away-name">Ausw&auml;rtsteam</strong></div>
+              </div>
+              <div class="prediction-split">
+                <div><span id="hero-score-label">Status</span><strong id="hero-score">Offen</strong></div>
+                <i></i>
+                <div class="hero-model-predictions" id="hero-model-predictions">
+                  <span>PROGNOSE</span>
+                  <strong>4 Modelle</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-heading">
+          <div><span class="section-kicker" id="today-kicker">Heute in unserer Runde</span><h2 id="today-heading">Bereit f&uuml;r den Anpfiff?</h2></div>
+          <span class="round-label" id="round-summary">Teilnehmer werden geladen</span>
+        </div>
+
+        <div class="dashboard-grid upgraded">
+          <article class="dashboard-card tip-status">
+            <div class="icon-box lime">&#10003;</div>
+            <div><span>Deine Tipps</span><h3>Noch alles offen</h3><p id="today-tip-copy">Gib deine Tipps f&uuml;r die n&auml;chsten Spiele ab.</p></div>
+            <button class="text-button" data-go="tips">Tippen &rarr;</button>
+          </article>
+          <article class="dashboard-card form-card">
+            <div class="icon-box violet">&#8599;</div>
+            <div><span>Deine Form</span><h3 id="home-rank">Noch keine Wertung</h3><p id="home-rank-copy">Nach dem ersten ausgewerteten Spiel erscheint hier dein Rang.</p></div>
+            <div class="mini-form" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <button class="text-button" data-go="ranking">Verlauf &rarr;</button>
+          </article>
+          <article class="dashboard-card cooper-card">
+            <div class="cooper-orbit"><span>C</span></div>
+            <div>
+              <span>Unsere besonderen Mitspieler</span>
+              <h3>AUTO-TIPPER</h3>
+              <p>DOG tippt zuf&auml;llig, RANK nach FIFA-Rang, STAT per Tormodell und DNA mit historischer WM-Erfahrung.</p>
+            </div>
+            <div class="auto-model-scoreboard">
+              <div class="auto-model-heading"><span>Modellwertung</span><small id="auto-model-summary">Noch kein Spiel gewertet</small></div>
+              <div id="auto-model-points"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="view" id="tips-view">
+        <div class="page-intro">
+          <span class="section-kicker">Der n&auml;chste Spieltag</span>
+          <h1>Was meinst du?</h1>
+          <p>Einfach Ergebnis eintragen und mitfiebern. Gewertet wird der Spielstand nach 90 Minuten.</p>
+          <div class="data-status"><i></i><span id="match-data-status">OpenLigaDB wird verbunden</span></div>
+        </div>
+        <section class="tip-profile-bar" id="tip-profile-bar" hidden>
+          <div>
+            <span class="section-kicker">Aktives Tipp-Profil</span>
+            <strong id="tip-profile-heading">Wer tippt gerade?</strong>
+            <small id="tip-profile-access">Deine erlaubten Profile werden geladen.</small>
+          </div>
+          <label>
+            <span>Tipps erfassen f&uuml;r</span>
+            <select id="tip-active-profile"><option value="">Profile werden geladen</option></select>
+          </label>
+        </section>
+        <div class="date-tabs" id="date-tabs" role="tablist" aria-label="Spieltage"></div>
+        <p class="match-view-note">W&auml;hle die Vorrunde nach Spieltag oder tippe die komplette K.-o.-Phase voraus. Noch nicht feststehende Mannschaften werden aus deinen bisherigen Tipps vorgeschlagen und bei neuen Ergebnissen automatisch aktualisiert.</p>
+        <div class="model-info">
+          <span class="cooper-dot">A</span>
+          <div><strong>Vier kostenlose Prognosemodelle</strong><p>DOG nutzt Zufall, RANK den FIFA-Ranglistenstand, STAT ein mathematisches Tormodell und DNA zus&auml;tzlich die historische WM-Finalbilanz.</p></div>
+          <span class="source-pill">Ranking-Snapshot 19.11.2025</span>
+        </div>
+        <div class="matches" id="matches-list"></div>
+        <section class="simulation-card">
+          <div class="simulation-heading">
+            <div>
+              <span class="section-kicker">Dein Was-wäre-wenn</span>
+              <h2>Simulierter Turnierbaum</h2>
+              <p>Wenn deine Gruppentipps genau so eintreffen: Wer erreicht die K.-o.-Runde und wer könnte dort auf wen treffen?</p>
+            </div>
+            <div class="simulation-controls">
+              <label><span>Simulation nach</span>
+                <select id="simulation-model">
+                  <option value="own">Mein Tipp</option>
+                  <option value="dog">DOG / Zufall</option>
+                  <option value="rank">RANK / FIFA-Rangliste</option>
+                  <option value="stat">STAT / Tormodell</option>
+                  <option value="dna">DNA / WM-Erfahrung</option>
+                </select>
+              </label>
+              <button class="secondary-button" id="refresh-simulation">Aktualisieren</button>
+            </div>
+          </div>
+          <div class="simulation-status" id="simulation-status"></div>
+          <div class="simulation-groups" id="simulation-groups"></div>
+          <div class="simulation-bracket" id="simulation-bracket"></div>
+          <p class="simulation-note">Vorschau nach Punkten, Tordifferenz und erzielten Toren. Die K.O.-Runde kombiniert echte IST-Ergebnisse mit dem aktuell gew&auml;hlten Prognosemodell f&uuml;r offene Spiele. RANK, STAT und DNA nutzen den FIFA-Ranglisten-Snapshot vom 19.11.2025; direkte Vergleiche und Fair-Play-Wertung sind nicht simuliert.</p>
+        </section>
+        <section class="fantasy-card">
+          <div class="fantasy-heading">
+            <div><span class="section-kicker">Meine Top 5</span><h2>Deine f&uuml;nf Turnierspieler</h2></div>
+            <span class="fantasy-counter" id="fantasy-counter">0 / 5 gew&auml;hlt</span>
+          </div>
+          <p>W&auml;hle Mannschaft und Spieler aus den WM-Kadern. Falls API-Football nicht erreichbar ist, nutzt die App automatisch den &ouml;ffentlichen Kaderstand. Der letzte erfolgreich geladene Kader bleibt auf diesem Ger&auml;t verf&uuml;gbar.</p>
+          <p class="fantasy-source">Torgefahr: L&auml;nderspieltore, Eins&auml;tze (LS) und daraus Tore je 10 LS. Fester Stand zum Turnierstart am 11.06.2026. Quelle: <a href="https://en.wikipedia.org/wiki/2026_FIFA_World_Cup_squads" target="_blank" rel="noopener">WM-Kader&uuml;bersicht</a>. WM-Tore werden separat laufend erg&auml;nzt.</p>
+          <div class="fantasy-picks" id="fantasy-picks"></div>
+          <button class="secondary-button" id="save-fantasy-picks">Top 5 speichern</button>
+        </section>
+        <div class="save-panel">
+          <div><strong id="tip-progress">Spielplan wird geladen</strong><span>Deine Tipps werden auf diesem Ger&auml;t gespeichert.</span></div>
+          <button class="primary-button save-button" id="save-tips">Tipps speichern</button>
+        </div>
+      </section>
+
+      <section class="view" id="ranking-view">
+        <div class="page-intro ranking-intro">
+          <div><span class="section-kicker">Unsere Runde</span><h1>Wer hat den besten Riecher?</h1><p>Die aktuelle Tabelle und alle kleinen Aufholjagden.</p></div>
+          <label class="league-select" for="participant-filter">
+            <span>Anzeige</span>
+            <select id="participant-filter">
+              <option value="all">Alle Teilnehmer</option>
+            </select>
+          </label>
+        </div>
+
+        <section class="chart-card">
+          <div class="chart-header">
+            <div><span class="section-kicker">So lief es bisher</span><h2>Das Rennen um Platz 1</h2></div>
+            <div class="chart-toggle" role="group" aria-label="Zeitraum">
+              <button class="active" data-range="all">Gesamt</button><button data-range="recent">Letzte 4</button>
+            </div>
+          </div>
+          <div class="chart-legend" id="chart-legend"></div>
+          <div class="rank-chart-wrap">
+            <div class="axis-label top">1.</div><div class="axis-label bottom">6.</div>
+            <svg id="rank-chart" viewBox="0 0 900 330" role="img" aria-label="Rangentwicklung der Teilnehmer"></svg>
+          </div>
+          <div class="chart-note"><span></span> Je h&ouml;her die Linie, desto besser die Platzierung.</div>
+        </section>
+
+        <section class="matrix-card">
+          <div class="matrix-header">
+            <div>
+              <span class="section-kicker">Wer tippt was?</span>
+              <h2>Unsere Tipps im Vergleich</h2>
+              <p>Auf einen Blick sehen, wer mutig tippt und wer auf Nummer sicher geht.</p>
+            </div>
+            <div class="matrix-controls">
+              <button class="active">Spieltag 1</button>
+              <span><i></i> Tipps sichtbar</span>
+            </div>
+          </div>
+          <div class="tip-matrix-wrap">
+            <table class="tip-matrix" id="tip-matrix"></table>
+          </div>
+          <div class="matrix-footer">
+            <span><i class="matrix-swatch exact"></i> Exakter Tipp</span>
+            <span><i class="matrix-swatch tendency"></i> Richtige Tendenz</span>
+            <span><i class="matrix-swatch cooper"></i> Automatischer Tipp-Spieler</span>
+            <small>Vor Anpfiff nur innerhalb der privaten Liga sichtbar.</small>
+          </div>
+        </section>
+
+        <div class="ranking-layout">
+          <div class="ranking-table-wrap">
+            <div class="table-heading"><strong>Aktuelle Tabelle</strong><span>Nach Spieltag 6</span></div>
+            <table class="ranking-table">
+              <thead><tr><th>Rang</th><th>Spieler</th><th>Tipps</th><th>Top 5</th><th>Gesamt</th></tr></thead>
+              <tbody id="ranking-body"></tbody>
+            </table>
+          </div>
+          <aside class="cooper-panel">
+            <span class="panel-label">AUTO-TIPPER</span>
+            <div class="cooper-core"><span>A</span><i></i></div>
+            <h3>Drei Strategien</h3>
+            <p>Lege einen automatischen Mitspieler an und w&auml;hle seine nachvollziehbare Strategie.</p>
+            <dl>
+              <div><dt>DOG</dt><dd>Zufall</dd></div>
+              <div><dt>RANK</dt><dd>FIFA-Rangliste</dd></div>
+              <div><dt>STAT</dt><dd>Rang + Poisson</dd></div>
+              <div><dt>Gewichtung</dt><dd>0,75 bis 1,25</dd></div>
+            </dl>
+          </aside>
+        </div>
+
+        <section class="points-ledger">
+          <div class="points-ledger-head">
+            <div><span class="section-kicker">Nachvollziehbare Wertung</span><h2>Punkte nach Spieltag</h2><p>Spieltag aufklappen, Einzelspiel ausw&auml;hlen und bis zu Teilnehmern und Teams heruntergehen.</p></div>
+            <div class="ledger-head-actions">
+              <label class="ledger-filter-label"><span>Anzeige filtern</span><select id="ledger-filter"><option value="all">Alle Teilnehmer &amp; Teams</option></select></label>
+              <span id="ledger-scoring-start">Wertungsstart wird geladen</span>
+              <button id="ledger-refresh" type="button">Punkte aktualisieren</button>
+              <button id="ledger-expand-all" type="button">Alle &ouml;ffnen</button>
+              <button id="ledger-collapse-all" type="button">Alle schlie&szlig;en</button>
+            </div>
+          </div>
+          <div id="points-ledger-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="teams-view">
+        <div class="page-intro team-intro">
+          <div>
+            <span class="section-kicker">Eure Tipprunde</span>
+            <h1>Teams &amp; Spieler</h1>
+            <p>Stelle eure Teams zusammen und lege fest, wie die gemeinsame Wertung funktioniert.</p>
+          </div>
+          <button class="primary-button compact-button" id="open-team-creator">+ Neues Team</button>
+        </div>
+
+        <div class="team-rule-banner">
+          <span class="rule-number">5</span>
+          <div><strong>Top-5-Teamwertung</strong><p>Je Team flie&szlig;en die f&uuml;nf punktbesten aktiven Teilnehmer eines Spieltags ein.</p></div>
+          <span class="rule-formula">GEWICHTETE TOP 5</span>
+        </div>
+        <p class="team-link-note">Wichtig f&uuml;r die Auswertung: Der Anzeigename bei der Anmeldung muss dem Spielernamen im Team entsprechen.</p>
+        <p class="team-link-note model-note">RANK und STAT arbeiten mit einem festen FIFA-Ranglisten-Snapshot vom 19. November 2025. STAT berechnet daraus erwartete Tore; es sind keine Live-Quoten.</p>
+
+        <section class="scoring-start-card">
+          <div><span class="section-kicker">Nur Organisator</span><h2>Wertungsstart</h2><p>Spiele vor diesem Zeitpunkt bleiben sichtbar, z&auml;hlen aber nicht f&uuml;r Einzel- oder Teamwertung.</p></div>
+          <div class="scoring-start-form">
+            <input id="scoring-start" type="datetime-local" aria-label="Wertungsstart">
+            <button class="secondary-button" id="save-scoring-start">Wertungsstart speichern</button>
+          </div>
+          <small id="scoring-start-status">Noch kein Wertungsstart festgelegt.</small>
+        </section>
+
+        <section class="scorer-admin" id="scorer-admin" hidden>
+          <div><span class="section-kicker">Nur Organisator</span><h2>Torsch&uuml;tzen-Korrektur</h2><p>Die Tore werden automatisch von API-Football geladen. Hier kannst du nur bei Bedarf einen Eintrag korrigieren.</p></div>
+          <div class="scorer-form">
+            <select id="scorer-match"></select>
+            <input id="scorer-player" type="text" placeholder="Name des Torsch&uuml;tzen">
+            <input id="scorer-team" type="text" placeholder="Nationalmannschaft">
+            <input id="scorer-goals" type="number" min="1" max="10" value="1" aria-label="Tore">
+            <button class="primary-button" id="save-scorer">Speichern</button>
+          </div>
+        </section>
+
+        <section class="bot-creator" id="team-creator" hidden>
+          <div class="creator-heading">
+            <div><span class="section-kicker">Neues Team</span><h2>Wie soll euer Team hei&szlig;en?</h2></div>
+            <button class="close-button" id="close-team-creator" aria-label="Schlie&szlig;en">&times;</button>
+          </div>
+          <div class="creator-form team-creator-form">
+            <label><span>Teamname</span><input id="team-name" type="text" maxlength="24" placeholder="z. B. Team Nordkurve"></label>
+            <label><span>Teamart</span><select id="team-category"><option value="family">Family</option><option value="single">Single</option></select></label>
+            <label><span>Teamfarbe</span><input id="team-color" type="color" value="#c9ff38"></label>
+            <button class="primary-button" id="create-team">Team anlegen</button>
+          </div>
+        </section>
+
+        <div class="team-grid" id="team-grid"></div>
+
+        <section class="rules-card">
+          <div class="rules-heading">
+            <div><span class="section-kicker">Punktevergabe</span><h2>Eure Bewertungskategorien</h2><p>Pro Tipp zählt nur die beste passende Kategorie: Ergebnis vor Tordifferenz vor Tendenz vor Gesamtzahl Tore.</p></div>
+            <span class="rules-lock" id="rules-access-label">Nur Organisator</span>
+          </div>
+          <div class="rules-layout">
+            <div>
+              <div class="rule-inputs" id="rule-inputs"></div>
+            </div>
+            <div class="rule-preview">
+              <span class="panel-label">EURE REGELN</span>
+              <h3 id="rule-count">0 Kategorien</h3>
+              <p>Einzelregeln werden je Tipp gewertet. Der beste gewichtete Top-5-Teamwert erh&auml;lt zus&auml;tzlich den Spiel- und Spieltagsbonus. Bei Gleichstand bekommen alle Bestplatzierten den Bonus.</p>
+              <div class="rule-total"><span>Maximal erreichbar</span><strong id="rule-total">0</strong></div>
+            </div>
+          </div>
+          <div class="rules-footer">
+            <label class="check-option"><input type="checkbox" checked><span>Automatische Teilnehmer z&auml;hlen vollwertig f&uuml;r Einzel- und Teamwertung</span></label>
+            <button class="secondary-button" id="save-rules">Regeln speichern</button>
+          </div>
+        </section>
+      </section>
+    </main>
+    <footer class="app-version">TippRadar 26 &middot; Version <span id="app-version">2026.06.18-R43 &middot; Berlin</span></footer>
+
+    <nav class="mobile-nav" aria-label="Mobile Navigation">
+      <button class="active" data-view="home"><span>&#8962;</span>Heute</button>
+      <button data-view="tips"><span>&#9671;</span>Tippen</button>
+      <button data-view="ranking"><span>&#9638;</span>Rang &amp; Form</button>
+      <button data-view="teams"><span>&#9678;</span>Teams</button>
+    </nav>
+    <div class="toast" id="toast" role="status" aria-live="polite"><span>&#10003;</span><div><strong>Tipps gespeichert</strong><small>Viel Erfolg!</small></div></div>
+    <div class="account-modal" id="account-modal" hidden>
+      <div class="account-dialog">
+        <button class="close-button account-close" id="account-close" aria-label="Schlie&szlig;en">&times;</button>
+        <div id="cloud-unconfigured">
+          <span class="section-kicker">Testbetrieb vorbereiten</span>
+          <h2>Noch lokal unterwegs</h2>
+          <p>Die App funktioniert, speichert aber nur auf diesem Ger&auml;t. F&uuml;r mehrere Teilnehmer muss einmalig Supabase eingerichtet werden.</p>
+          <div class="setup-hint">Anleitung: <strong>TESTBETRIEB.md</strong></div>
+        </div>
+        <div id="cloud-login" hidden>
+          <span class="section-kicker">Ohne Passwort</span>
+          <h2>Per E-Mail anmelden</h2>
+          <p>Wir schicken dir einen einmaligen Anmeldelink und Anmeldecode. Danach bleibt dieser Browser angemeldet.</p>
+          <label class="account-field"><span>E-Mail-Adresse</span><input id="login-email" type="email" placeholder="name@beispiel.de"></label>
+          <button class="primary-button full-button" id="send-magic-link">Anmeldelink senden</button>
+          <div class="login-code-panel" id="login-code-panel">
+            <div class="login-divider"><span>oder mit Code</span></div>
+            <label class="account-field"><span>Sechsstelliger Anmeldecode</span><input id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"></label>
+            <button class="secondary-button full-button" id="verify-login-code">Code best&auml;tigen</button>
+            <p class="login-code-note">Der Code ist zuverl&auml;ssiger, falls Outlook den Anmeldelink vorab sicherheitspr&uuml;ft.</p>
+          </div>
+        </div>
+        <div id="cloud-onboarding" hidden>
+          <span class="section-kicker">Willkommen</span>
+          <h2>Tipprunde ausw&auml;hlen</h2>
+          <label class="account-field"><span>Dein Anzeigename</span><input id="member-name" type="text" placeholder="Dein Name"></label>
+          <label class="account-field"><span>Kontoart</span><select id="account-type"><option value="single">Single / ein Teilnehmer</option><option value="family">Family / mehrere Profile</option></select></label>
+          <div class="onboarding-options">
+            <div><strong>Runde beitreten</strong><input id="join-code" type="text" maxlength="12" placeholder="Einladungscode"><button id="join-league">Beitreten</button></div>
+            <div><strong>Neue Runde erstellen</strong><input id="league-name" type="text" placeholder="Name der Runde"><input id="new-invite-code" type="text" maxlength="12" placeholder="Wunschcode"><button id="create-league">Erstellen</button></div>
+          </div>
+        </div>
+        <div id="cloud-account" hidden>
+          <span class="section-kicker">Zentral verbunden</span>
+          <h2 id="cloud-league-name">Unsere Tipprunde</h2>
+          <p>Teams, Regeln und Tipps werden jetzt f&uuml;r alle Teilnehmer zentral gespeichert.</p>
+          <div class="setup-hint">Einladungscode: <strong id="cloud-invite-code"></strong></div>
+          <div class="organizer-hint">Organisator: <strong id="cloud-organizer-name">wird geladen</strong></div>
+          <a class="tutorial-link" href="/tutorial/" target="_blank" rel="noopener">Kurzanleitung &ouml;ffnen</a>
+          <div class="profile-switcher">
+            <label><span>Kontoart</span><select id="current-account-type"><option value="single">Single</option><option value="family">Family</option></select></label>
+            <label><span>Wer tippt gerade?</span><select id="active-profile"><option value="">Profile werden geladen</option></select></label>
+            <label id="profile-auto-field"><span>Tippmodus dieses Profils</span><select id="profile-auto-strategy"><option value="manual">Manuell</option><option value="dog">DOG / Zufall</option><option value="rank">RANK / FIFA-Rangliste</option><option value="stat">STAT / Rangliste + Tormodell</option></select></label>
+            <p class="profile-auto-note">Eine Auto-Variante ersetzt die Tipps aller noch offenen Spiele. Bereits angepfiffene Spiele bleiben unver&auml;ndert.</p>
+            <div id="family-profile-creator" hidden>
+              <input id="family-profile-name" type="text" maxlength="24" placeholder="Name des Kindes">
+              <button id="add-family-profile">+ Kinderprofil</button>
+            </div>
+            <p class="profile-access-note">Erwachsene und Jugendliche mit eigenem Zugang melden sich mit eigener E-Mail an. Unter 16 Jahren bitte nur mit Zustimmung der Eltern. Kinderprofile werden vom Family-Team-Lead verwaltet.</p>
+          </div>
+          <button class="secondary-button full-button" id="sign-out">Abmelden</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js?v=20260618-r43"></script>
+  <script src="cloud.js?v=20260618-r43"></script>
+  <script src="app.js?v=20260618-r43"></script>
+</body>
+</html>
